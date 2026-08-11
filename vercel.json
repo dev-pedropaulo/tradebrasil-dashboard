@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/nocodb/:path*",
+      "destination": "https://agentesn8n-nocodb.cqc86v.easypanel.host/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
