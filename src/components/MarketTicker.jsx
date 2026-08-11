@@ -5,25 +5,27 @@ import { TrendingUp, TrendingDown, Radio } from 'lucide-react';
 export default function MarketTicker() {
   const [quotes, setQuotes] = useState(INITIAL_QUOTES);
   const [isLive, setIsLive] = useState(false);
-  const [lastUpdate, setLastUpdate] = useState(null);
 
   const updateQuotes = async () => {
-    const res = await fetchLiveMarketQuotes();
-    if (res && res.quotes) {
-      setQuotes(res.quotes);
-      setIsLive(res.isLive);
-      setLastUpdate(new Date().toLocaleTimeString('pt-BR'));
+    try {
+      const res = await fetchLiveMarketQuotes();
+      if (res && res.quotes) {
+        setQuotes(res.quotes);
+        setIsLive(!!res.isLive);
+      }
+    } catch (err) {
+      console.warn('MarketTicker update failed gracefully:', err);
     }
   };
 
   useEffect(() => {
     updateQuotes();
-    // Poll live quotes every 30 seconds
     const interval = setInterval(updateQuotes, 30000);
     return () => clearInterval(interval);
   }, []);
 
-  const items = Object.values(quotes);
+  const safeQuotes = quotes || INITIAL_QUOTES;
+  const items = Object.values(safeQuotes);
 
   return (
     <div className="clean-card" style={{
@@ -63,18 +65,22 @@ export default function MarketTicker() {
           gap: '1.25rem',
           flexWrap: 'wrap'
         }}>
-          {items.map((item) => {
+          {items.map((item, idx) => {
+            if (!item) return null;
             const isUp = item.trend === 'up';
+            const nameLabel = item.name ? String(item.name).split(' ')[0] : (item.symbol || 'Cotação');
+            const priceVal = typeof item.price === 'number' ? item.price.toFixed(2) : (item.price || '0.00');
+
             return (
-              <div key={item.symbol} style={{
+              <div key={item.symbol || idx} style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.5rem',
                 fontSize: '0.8rem'
               }}>
-                <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>{item.name.split(' ')[0]}:</span>
+                <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>{nameLabel}:</span>
                 <span className="font-mono" style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
-                  R$ {typeof item.price === 'number' ? item.price.toFixed(2) : item.price}
+                  R$ {priceVal}
                 </span>
                 <span style={{
                   display: 'inline-flex',
@@ -84,7 +90,7 @@ export default function MarketTicker() {
                   color: isUp ? 'var(--accent-emerald)' : 'var(--accent-rose)'
                 }}>
                   {isUp ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                  <span style={{ marginLeft: '2px' }}>{item.changePercent}</span>
+                  <span style={{ marginLeft: '2px' }}>{item.changePercent || '0.00%'}</span>
                 </span>
               </div>
             );

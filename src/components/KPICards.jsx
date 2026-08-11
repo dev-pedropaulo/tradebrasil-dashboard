@@ -2,8 +2,9 @@ import React from 'react';
 import { Users, DollarSign, Flame, Wheat } from 'lucide-react';
 
 export default function KPICards({ leadsFormatted, portfolioStats }) {
-  const totalLeads = leadsFormatted.length;
-  const hotLeadsCount = leadsFormatted.filter(l => l.isHot).length;
+  const safeLeads = Array.isArray(leadsFormatted) ? leadsFormatted : [];
+  const totalLeads = safeLeads.length;
+  const hotLeadsCount = safeLeads.filter(l => l && l.isHot).length;
   const hotLeadsPercent = totalLeads > 0 ? Math.round((hotLeadsCount / totalLeads) * 100) : 0;
 
   const totalValorR$ = portfolioStats ? portfolioStats.totalExposicaoR$ : 0;

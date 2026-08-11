@@ -125,7 +125,11 @@ export function calculatePortfolioValue(leadsFormatted, quotes = currentQuotes) 
   let totalSacasSoja = 0;
   let totalBois = 0;
 
-  leadsFormatted.forEach(lead => {
+  const safeLeads = Array.isArray(leadsFormatted) ? leadsFormatted : [];
+  const safeQuotes = quotes || INITIAL_QUOTES;
+
+  safeLeads.forEach(lead => {
+    if (!lead) return;
     if (lead.volume_safra) {
       if (lead.volume_safra.includes('10_a_20')) totalSacasMilho += 15000;
       else if (lead.volume_safra.includes('20_a_50')) totalSacasSoja += 35000;
@@ -140,9 +144,9 @@ export function calculatePortfolioValue(leadsFormatted, quotes = currentQuotes) 
     }
   });
 
-  const milhoPrice = quotes.MILHO?.price || 64.80;
-  const sojaPrice = quotes.SOJA?.price || 138.50;
-  const boiPrice = quotes.BOI?.price || 245.90;
+  const milhoPrice = safeQuotes.MILHO?.price || 64.80;
+  const sojaPrice = safeQuotes.SOJA?.price || 138.50;
+  const boiPrice = safeQuotes.BOI?.price || 245.90;
 
   const valorMilho = totalSacasMilho * milhoPrice;
   const valorSoja = totalSacasSoja * sojaPrice;
