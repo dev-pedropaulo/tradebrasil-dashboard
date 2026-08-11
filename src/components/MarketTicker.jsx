@@ -69,7 +69,7 @@ export default function MarketTicker() {
             const dolar = safeQuotes.DOLAR;
             if (!dolar) return null;
             const isUp = dolar.trend === 'up';
-            const priceVal = typeof dolar.price === 'number' ? dolar.price.toFixed(4) : (dolar.price || '0.0000');
+            const priceVal = typeof dolar.price === 'number' ? dolar.price.toFixed(2) : (dolar.price || '0.00');
 
             return (
               <div style={{
