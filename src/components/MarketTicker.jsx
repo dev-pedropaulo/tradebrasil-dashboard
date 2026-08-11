@@ -49,7 +49,7 @@ export default function MarketTicker() {
             textTransform: 'uppercase',
             letterSpacing: '0.06em'
           }}>
-            Cotações Agrícolas (B3 / CBOT)
+            Câmbio (Dólar Comercial)
           </span>
 
           <span className={`badge-clean ${isLive ? 'badge-emerald' : 'badge-neutral'}`} style={{ fontSize: '0.65rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
@@ -65,20 +65,20 @@ export default function MarketTicker() {
           gap: '1.25rem',
           flexWrap: 'wrap'
         }}>
-          {items.map((item, idx) => {
-            if (!item) return null;
-            const isUp = item.trend === 'up';
-            const nameLabel = item.name ? String(item.name).split(' ')[0] : (item.symbol || 'Cotação');
-            const priceVal = typeof item.price === 'number' ? item.price.toFixed(2) : (item.price || '0.00');
+          {(() => {
+            const dolar = safeQuotes.DOLAR;
+            if (!dolar) return null;
+            const isUp = dolar.trend === 'up';
+            const priceVal = typeof dolar.price === 'number' ? dolar.price.toFixed(4) : (dolar.price || '0.0000');
 
             return (
-              <div key={item.symbol || idx} style={{
+              <div style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.5rem',
                 fontSize: '0.8rem'
               }}>
-                <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>{nameLabel}:</span>
+                <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>Dólar (USD/BRL):</span>
                 <span className="font-mono" style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
                   R$ {priceVal}
                 </span>
@@ -90,11 +90,16 @@ export default function MarketTicker() {
                   color: isUp ? 'var(--accent-emerald)' : 'var(--accent-rose)'
                 }}>
                   {isUp ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                  <span style={{ marginLeft: '2px' }}>{item.changePercent || '0.00%'}</span>
+                  <span style={{ marginLeft: '2px' }}>{dolar.changePercent || '0.00%'}</span>
                 </span>
+                {dolar.lastUpdate && (
+                  <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginLeft: '0.25rem' }}>
+                    Atualizado: {dolar.lastUpdate}
+                  </span>
+                )}
               </div>
             );
-          })}
+          })()}
         </div>
       </div>
     </div>

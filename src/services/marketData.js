@@ -83,29 +83,6 @@ export async function fetchLiveMarketQuotes() {
           lastUpdate: new Date().toLocaleTimeString('pt-BR')
         };
 
-        const usdFactor = price / 5.10;
-
-        live.SOJA = {
-          ...live.SOJA,
-          price: parseFloat((138.50 * usdFactor).toFixed(2)),
-          changePercent: `${isUp ? '+' : ''}${(pctChangeNum + 0.45).toFixed(2)}%`,
-          trend: isUp ? 'up' : 'down'
-        };
-
-        live.MILHO = {
-          ...live.MILHO,
-          price: parseFloat((64.80 * (1 + (pctChangeNum / 200))).toFixed(2)),
-          changePercent: `${pctChangeNum < 0 ? '' : '+'}${(pctChangeNum * 0.7).toFixed(2)}%`,
-          trend: pctChangeNum >= 0 ? 'up' : 'down'
-        };
-
-        live.BOI = {
-          ...live.BOI,
-          price: parseFloat((245.90 * (1 + (pctChangeNum / 300))).toFixed(2)),
-          changePercent: `+${Math.abs(pctChangeNum * 0.8 + 0.35).toFixed(2)}%`,
-          trend: 'up'
-        };
-
         currentQuotes = live;
         return { success: true, quotes: live, isLive: true };
       }
