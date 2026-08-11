@@ -131,16 +131,18 @@ export function calculatePortfolioValue(leadsFormatted, quotes = currentQuotes) 
   safeLeads.forEach(lead => {
     if (!lead) return;
     if (lead.volume_safra) {
-      if (lead.volume_safra.includes('10_a_20')) totalSacasMilho += 15000;
-      else if (lead.volume_safra.includes('20_a_50')) totalSacasSoja += 35000;
-      else if (lead.volume_safra.includes('50_a_100')) totalSacasSoja += 75000;
-      else if (lead.volume_safra.includes('acima_de_100')) totalSacasSoja += 120000;
+      const volSafraStr = String(lead.volume_safra);
+      if (volSafraStr.includes('10_a_20')) totalSacasMilho += 15000;
+      else if (volSafraStr.includes('20_a_50')) totalSacasSoja += 35000;
+      else if (volSafraStr.includes('50_a_100')) totalSacasSoja += 75000;
+      else if (volSafraStr.includes('acima_de_100')) totalSacasSoja += 120000;
     }
 
     if (lead.volume_bois) {
-      if (lead.volume_bois.includes('500_a_1.000')) totalBois += 750;
-      else if (lead.volume_bois.includes('1.000_a_2.000')) totalBois += 1500;
-      else if (lead.volume_bois.includes('acima_de_2.000')) totalBois += 3000;
+      const volBoisStr = String(lead.volume_bois);
+      if (volBoisStr.includes('500_a_1.000')) totalBois += 750;
+      else if (volBoisStr.includes('1.000_a_2.000')) totalBois += 1500;
+      else if (volBoisStr.includes('acima_de_2.000')) totalBois += 3000;
     }
   });
 

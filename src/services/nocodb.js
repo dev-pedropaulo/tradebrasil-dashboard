@@ -166,9 +166,9 @@ export function formatLeadData(lead) {
     ...lead,
     estado: normalizedUF,
     estadoRaw: lead.estado, // preserve original text if needed for reference
-    atuacaoLabel: atuacaoMap[lead.atuacao?.toLowerCase()] || lead.atuacao || 'Não Informado',
+    atuacaoLabel: atuacaoMap[String(lead.atuacao || '').toLowerCase()] || lead.atuacao || 'Não Informado',
     momentoLabel: momentoMap[lead.momento_protecao] || lead.momento_protecao || 'Em Análise',
-    culturaLabel: lead.cultura_principal ? lead.cultura_principal.toUpperCase() : (lead.atuacao?.includes('pecu') ? 'Gado de Corte' : 'Geral'),
+    culturaLabel: lead.cultura_principal ? String(lead.cultura_principal).toUpperCase() : (String(lead.atuacao || '').includes('pecu') ? 'Gado de Corte' : 'Geral'),
     volumeSafraLabel: volumeSafraMap[lead.volume_safra] || lead.volume_safra || '-',
     volumeBoisLabel: volumeBoisMap[lead.volume_bois] || lead.volume_bois || '-',
     isHot: lead.momento_protecao === 'quero_avaliar_uma_estratégia_agora'
