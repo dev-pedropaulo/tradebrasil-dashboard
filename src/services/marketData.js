@@ -197,6 +197,10 @@ export function simulateHedgeStrategy({ tipoCommodity, volume, precoGarantido, t
 
   const protecaoGanhoR$ = receitaLiquidaGarantida - valorBrutoSemHedge;
 
+  const precoEstresse = unitPrice * 0.8;
+  const valorSemHedgeEstresse = vol * precoEstresse;
+  const perdaEvitada20 = receitaLiquidaGarantida - valorSemHedgeEstresse;
+
   return {
     unitPrice,
     unitName,
@@ -205,6 +209,7 @@ export function simulateHedgeStrategy({ tipoCommodity, volume, precoGarantido, t
     custoOpcao,
     receitaLiquidaGarantida,
     protecaoGanhoR$,
+    perdaEvitada20,
     isProtected: protecaoGanhoR$ >= 0
   };
 }

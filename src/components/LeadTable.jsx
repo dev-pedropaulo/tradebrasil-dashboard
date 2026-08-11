@@ -11,10 +11,10 @@ export default function LeadTable({ leadsFormatted, onSelectLead }) {
 
   const filteredLeads = leadsFormatted.filter(lead => {
     const matchesSearch =
-      (lead.nome && lead.nome.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (lead.telefone && lead.telefone.includes(searchTerm)) ||
-      (lead.id_meta && lead.id_meta.includes(searchTerm)) ||
-      (lead.estado && lead.estado.toLowerCase().includes(searchTerm.toLowerCase()));
+      (lead.nome && String(lead.nome).toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (lead.telefone && String(lead.telefone).includes(searchTerm)) ||
+      (lead.id_meta && String(lead.id_meta).includes(searchTerm)) ||
+      (lead.estado && String(lead.estado).toLowerCase().includes(searchTerm.toLowerCase()));
 
     const matchesAtuacao =
       filterAtuacao === 'all' ||
