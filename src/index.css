@@ -276,3 +276,82 @@ body {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.3; }
 }
+
+/* Follow-up workspace */
+.followup-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.followup-section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-family: var(--font-heading);
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin-bottom: 0.35rem;
+}
+
+.followup-help {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  line-height: 1.45;
+  margin-bottom: 0.8rem;
+}
+
+.followup-textarea { min-height: 105px; resize: vertical; }
+
+.followup-form-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+  margin-top: 0.7rem;
+}
+
+.followup-oneoff-row { grid-template-columns: 1.4fr 1fr 1fr; }
+
+.followup-checkbox {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  margin-top: 0.9rem;
+}
+
+.followup-checkbox input { accent-color: var(--accent-emerald); margin-top: 0.15rem; }
+
+.followup-list { display: grid; gap: 0.45rem; margin-top: 1rem; max-height: 195px; overflow-y: auto; }
+
+.followup-list-item {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 0.55rem 0.65rem;
+  display: grid;
+  gap: 0.2rem;
+  font-size: 0.76rem;
+}
+
+.followup-list-item span { color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.followup-alert {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: var(--radius-sm);
+  margin-bottom: 1rem;
+  font-size: 0.82rem;
+}
+
+.followup-alert-error { color: #fecdd3; background: var(--accent-rose-subtle); border: 1px solid rgba(244, 63, 94, 0.25); }
+.followup-alert-success { color: #a7f3d0; background: var(--accent-emerald-subtle); border: 1px solid rgba(16, 185, 129, 0.25); }
+.followup-empty { text-align: center; padding: 1.5rem !important; color: var(--text-muted) !important; }
+.followup-cancel { color: #fda4af; }
+
+@media (max-width: 760px) {
+  .followup-grid, .followup-form-row, .followup-oneoff-row { grid-template-columns: 1fr; }
+}

@@ -7,15 +7,14 @@ import BrazilMap from './components/BrazilMap';
 import HedgeSimulator from './components/HedgeSimulator';
 import LeadTable from './components/LeadTable';
 import LeadModal from './components/LeadModal';
+import FollowupsPage from './components/FollowupsPage';
 
 import { fetchNocoDBLeads, formatLeadData } from './services/nocodb';
 import { calculatePortfolioValue } from './services/marketData';
-import { LayoutDashboard, BarChart3, Calculator, Table, RefreshCw } from 'lucide-react';
+import { LayoutDashboard, Calculator, Table, RefreshCw, CalendarClock } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('overview');
-  const [token, setToken] = useState('MAzqioK1wEs1N3cqgaE9yJIQ0RDloKhrZx7oW3fG');
-  
   const [leadsRaw, setLeadsRaw] = useState([]);
   const [leadsFormatted, setLeadsFormatted] = useState([]);
   const [portfolioStats, setPortfolioStats] = useState(null);
@@ -27,10 +26,10 @@ export default function App() {
   
   const [selectedLead, setSelectedLead] = useState(null);
 
-  const loadData = async (currentToken = token) => {
+  const loadData = async () => {
     setLoading(true);
     try {
-      const result = await fetchNocoDBLeads(currentToken);
+      const result = await fetchNocoDBLeads();
 
       if (result && result.data && Array.isArray(result.data)) {
         setLeadsRaw(result.data);
@@ -64,7 +63,7 @@ export default function App() {
       {/* Clean Header */}
       <Header
         isLive={isLive}
-        onRefresh={() => loadData(token)}
+        onRefresh={loadData}
       />
 
       <main className="main-content">
@@ -96,10 +95,18 @@ export default function App() {
             <Table size={15} />
             <span>Produtores Rurais ({leadsFormatted.length})</span>
           </button>
+
+          <button
+            onClick={() => setActiveTab('followups')}
+            className={`tab-item ${activeTab === 'followups' ? 'active' : ''}`}
+          >
+            <CalendarClock size={15} />
+            <span>Follow-ups</span>
+          </button>
         </div>
 
         {/* Content */}
-        {loading ? (
+        {loading && activeTab !== 'followups' ? (
           <div className="clean-card" style={{ padding: '3rem', textAlign: 'center', margin: '2rem 0' }}>
             <RefreshCw size={28} color="var(--accent-emerald)" style={{ animation: 'spin 1s linear infinite', margin: '0 auto 0.75rem auto' }} />
             <h3 style={{ fontFamily: 'var(--font-heading)', fontSize: '1rem', fontWeight: 600 }}>Carregando dados...</h3>
@@ -128,6 +135,8 @@ export default function App() {
                 <LeadTable leadsFormatted={leadsFormatted} onSelectLead={(lead) => setSelectedLead(lead)} />
               </div>
             )}
+
+            {activeTab === 'followups' && <FollowupsPage />}
           </>
         )}
       </main>
