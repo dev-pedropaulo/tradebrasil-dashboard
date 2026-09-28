@@ -9,7 +9,7 @@ Mantenha todos os campos atuais. Crie apenas estas projeções, que facilitam fi
 | Campo | Tipo NocoDB | Valor |
 | --- | --- | --- |
 | `followup_ativo` | Checkbox | `true` enquanto houver uma agenda ativa |
-| `followup_status` | Single select | `ativo`, `cancelado`, `falhou` |
+| `followup_status` | Single line text | `ativo`, `cancelado`, `falhou` |
 | `followup_proximo_envio_em` | DateTime | Próximo disparo recorrente |
 | `followup_ultimo_envio_em` | DateTime | Último envio entregue ao provedor |
 
@@ -33,7 +33,7 @@ Os textos são estáticos nesta primeira versão; não cadastrar variáveis de t
 | --- | --- |
 | `lead_id` | Number |
 | `template_id` | Number |
-| `status` | Single select: `ativo`, `cancelado` |
+| `status` | Single line text: `ativo`, `cancelado` |
 | `recorrencia_dias` | Number |
 | `primeiro_envio_em` | DateTime |
 | `proximo_envio_em` | DateTime |
@@ -51,8 +51,8 @@ Regra de operação: existir no máximo uma linha com `status = ativo` para cada
 | `schedule_id` | Number |
 | `lead_id` | Number |
 | `template_id` | Number |
-| `tipo` | Single select: `recorrente`, `avulso`, `cancelamento_manual`, `cancelamento_resposta` |
-| `status` | Single select: `agendado`, `pendente`, `enviado`, `falhou`, `concluido` |
+| `tipo` | Single line text: `recorrente`, `avulso`, `cancelamento_manual`, `cancelamento_resposta` |
+| `status` | Single line text: `agendado`, `pendente`, `enviado`, `falhou`, `concluido` |
 | `agendado_para` | DateTime |
 | `executado_em` | DateTime |
 | `mensagem` | Long text |
