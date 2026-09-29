@@ -157,27 +157,59 @@ async function cancelSchedule(id) {
 }
 
 async function createOneOff(input) {
-  const scheduleId = requirePositiveId(input.scheduleId, 'Follow-up');
   const sendAt = new Date(input.sendAt);
   if (Number.isNaN(sendAt.getTime()) || sendAt <= new Date()) throw new Error('Data do envio avulso deve estar no futuro.');
-  const [schedules, templates] = await Promise.all([listRecords('schedules'), listRecords('templates')]);
-  const schedule = findById(schedules, scheduleId);
-  if (!schedule || schedule.status !== 'ativo') throw new Error('Follow-up ativo não encontrado.');
-  const template = findById(templates, input.templateId || schedule.template_id);
+
+  const [leads, templates, schedules] = await Promise.all([
+    listRecords('leads'),
+    listRecords('templates'),
+    listRecords('schedules'),
+  ]);
+
+  let lead = null;
+  let schedule = null;
+  let leadId = null;
+
+  if (input.leadId) {
+    leadId = requirePositiveId(input.leadId, 'Lead');
+    lead = findById(leads, leadId);
+    schedule = schedules.find((s) => s.status === 'ativo' && Number(s.lead_id) === leadId) || null;
+  } else if (input.scheduleId) {
+    const scheduleId = requirePositiveId(input.scheduleId, 'Follow-up');
+    schedule = findById(schedules, scheduleId);
+    if (!schedule || schedule.status !== 'ativo') throw new Error('Follow-up ativo não encontrado.');
+    leadId = Number(schedule.lead_id);
+    lead = findById(leads, leadId);
+  } else {
+    throw new Error('Lead obrigatório para agendamento avulso.');
+  }
+
+  if (!lead || !isValidLeadPhone(lead.telefone)) throw new Error('Lead válido com telefone não encontrado.');
+
+  const templateId = requirePositiveId(input.templateId || schedule?.template_id, 'Modelo');
+  const template = findById(templates, templateId);
   if (!template || template.ativo === false) throw new Error('Modelo ativo não encontrado.');
+
   const scheduledFor = input.sendAt;
+  const scheduleId = schedule ? recordId(schedule) : null;
   const event = await createRecord('events', toEventRecord({
     scheduleId,
-    leadId: Number(schedule.lead_id),
+    leadId,
     templateId: recordId(template),
     type: 'avulso',
     scheduledFor,
     message: template.mensagem,
   }));
+
+  const collisionWarning = schedule
+    ? hasScheduleCollision(scheduledFor, schedule.proximo_envio_em)
+    : false;
+
   return {
     event,
-    collisionWarning: hasScheduleCollision(scheduledFor, schedule.proximo_envio_em),
-    nextRecurringAt: schedule.proximo_envio_em,
+    collisionWarning,
+    nextRecurringAt: schedule?.proximo_envio_em || null,
+    hasSchedule: Boolean(schedule),
   };
 }
 

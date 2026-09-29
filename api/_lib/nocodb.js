@@ -44,13 +44,9 @@ export async function listRecords(name, params = {}) {
 }
 
 export function createRecord(name, fields) {
-  const payload = { ...fields };
-  if (name !== 'leads' && !payload.id && !payload.Id) {
-    payload.id = Date.now();
-  }
   return request(`/api/v2/tables/${tableId(name)}/records`, {
     method: 'POST',
-    body: JSON.stringify(payload),
+    body: JSON.stringify(fields),
   });
 }
 

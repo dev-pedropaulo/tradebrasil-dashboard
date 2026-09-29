@@ -52,7 +52,7 @@ export function leadFollowupProjection(schedule, active) {
 
 export function toEventRecord({ scheduleId, leadId, templateId, type, scheduledFor, message, source = 'dashboard' }) {
   return {
-    schedule_id: Number(scheduleId),
+    schedule_id: scheduleId ? Number(scheduleId) : null,
     lead_id: Number(leadId),
     template_id: Number(templateId),
     tipo: type,

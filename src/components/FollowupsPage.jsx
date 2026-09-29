@@ -75,7 +75,7 @@ export default function FollowupsPage() {
   });
 
   // Formulário de mensagem avulsa
-  const [oneOffForm, setOneOffForm] = useState({ scheduleId: '', templateId: '', sendAt: '' });
+  const [oneOffForm, setOneOffForm] = useState({ leadId: '', templateId: '', sendAt: '' });
 
   const load = async () => {
     setLoading(true);
@@ -137,6 +137,11 @@ export default function FollowupsPage() {
     () => workspace.events.filter((event) => event.status === 'falhou'),
     [workspace.events],
   );
+
+  const oneOffLeadSchedule = useMemo(() => {
+    if (!oneOffForm.leadId) return null;
+    return activeSchedules.find((s) => Number(s.lead_id) === Number(oneOffForm.leadId)) || null;
+  }, [oneOffForm.leadId, activeSchedules]);
 
   const leadName = (id) => workspace.leads.find((lead) => recordId(lead) === Number(id))?.nome || `Lead #${id}`;
   const templateName = (id) => workspace.templates.find((template) => recordId(template) === Number(id))?.nome || `Modelo #${id}`;
@@ -228,20 +233,19 @@ export default function FollowupsPage() {
   const submitOneOff = async (event) => {
     event.preventDefault();
     const payload = {
-      ...oneOffForm,
-      scheduleId: Number(oneOffForm.scheduleId),
-      templateId: oneOffForm.templateId ? Number(oneOffForm.templateId) : undefined,
+      leadId: Number(oneOffForm.leadId),
+      templateId: Number(oneOffForm.templateId),
       sendAt: toSaoPauloIso(oneOffForm.sendAt),
     };
     const result = await runMutation(
       () => scheduleOneOffMessage(payload),
       (response) => (
         response.collisionWarning
-          ? 'Mensagem avulsa agendada. Atenção: ela está a menos de 48h do próximo envio recorrente.'
-          : 'Mensagem avulsa agendada sem alterar a recorrência.'
+          ? 'Mensagem avulsa agendada com sucesso. Atenção: este lead possui follow-up recorrente agendado a menos de 48h desta data.'
+          : 'Mensagem avulsa agendada com sucesso.'
       ),
     );
-    if (result) setOneOffForm({ scheduleId: '', templateId: '', sendAt: '' });
+    if (result) setOneOffForm({ leadId: '', templateId: '', sendAt: '' });
   };
 
   const cancelSchedule = async (schedule) => {
@@ -538,25 +542,63 @@ export default function FollowupsPage() {
       {/* Bloco 3: Mensagem Programada Avulsa */}
       <form className="clean-card" style={sectionStyle} onSubmit={submitOneOff}>
         <div className="followup-section-title"><Send size={16} /> Mensagem programada avulsa</div>
-        <p className="followup-help">Pode ser enviada a qualquer momento sem reiniciar ou alterar a data do próximo follow-up recorrente.</p>
+        <p className="followup-help">
+          Envie uma mensagem pontual para qualquer lead, com ou sem follow-up recorrente ativo. Caso o lead já possua uma cadência ativa, suas datas recorrentes serão preservadas intactas.
+        </p>
         <div className="followup-form-row followup-oneoff-row">
-          <label style={fieldStyle}>Follow-up ativo
-            <select className="clean-select" required value={oneOffForm.scheduleId} onChange={(event) => setOneOffForm({ ...oneOffForm, scheduleId: event.target.value })}>
-              <option value="">Selecione</option>
-              {activeSchedules.map((schedule) => <option key={recordId(schedule)} value={recordId(schedule)}>{leadName(schedule.lead_id)} — próximo: {formatDate(schedule.proximo_envio_em)}</option>)}
+          <label style={fieldStyle}>Lead destinatário
+            <select
+              className="clean-select"
+              required
+              value={oneOffForm.leadId}
+              onChange={(event) => setOneOffForm({ ...oneOffForm, leadId: event.target.value })}
+            >
+              <option value="">Selecione um lead ({workspace.leads.length} disponíveis)</option>
+              {workspace.leads.map((lead) => (
+                <option key={recordId(lead)} value={recordId(lead)}>
+                  {lead.nome} — {lead.telefone}
+                </option>
+              ))}
             </select>
           </label>
-          <label style={fieldStyle}>Modelo (opcional)
-            <select className="clean-select" value={oneOffForm.templateId} onChange={(event) => setOneOffForm({ ...oneOffForm, templateId: event.target.value })}>
-              <option value="">Usar o modelo atual do follow-up</option>
-              {activeTemplates.map((template) => <option key={recordId(template)} value={recordId(template)}>#{recordId(template)} — {template.nome}</option>)}
+          <label style={fieldStyle}>Modelo de mensagem
+            <select
+              className="clean-select"
+              required
+              value={oneOffForm.templateId}
+              onChange={(event) => setOneOffForm({ ...oneOffForm, templateId: event.target.value })}
+            >
+              <option value="">Selecione um modelo ({activeTemplates.length} ativos)</option>
+              {activeTemplates.map((template) => (
+                <option key={recordId(template)} value={recordId(template)}>
+                  #{recordId(template)} — {template.nome}
+                </option>
+              ))}
             </select>
           </label>
-          <label style={fieldStyle}>Enviar em
-            <input className="clean-input" type="datetime-local" required value={oneOffForm.sendAt} onChange={(event) => setOneOffForm({ ...oneOffForm, sendAt: event.target.value })} />
+          <label style={fieldStyle}>Data e hora do envio
+            <input
+              className="clean-input"
+              type="datetime-local"
+              required
+              value={oneOffForm.sendAt}
+              onChange={(event) => setOneOffForm({ ...oneOffForm, sendAt: event.target.value })}
+            />
           </label>
         </div>
-        <button className="btn-clean" disabled={busy} type="submit" style={{ marginTop: '0.85rem' }}><Send size={14} /> Programar mensagem</button>
+
+        {oneOffLeadSchedule && (
+          <div style={{ marginTop: '0.65rem', padding: '0.5rem 0.75rem', background: 'rgba(16, 185, 129, 0.06)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: 'var(--radius-sm)', fontSize: '0.76rem', color: '#a7f3d0', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+            <Sparkles size={14} style={{ flexShrink: 0 }} />
+            <span>
+              <strong>Aviso de cadência:</strong> Este lead já possui follow-up recorrente ativo (próximo envio em <strong>{formatDate(oneOffLeadSchedule.proximo_envio_em)}</strong>). Esta mensagem avulsa não interromperá nem alterará a agenda recorrente dele.
+            </span>
+          </div>
+        )}
+
+        <button className="btn-clean btn-emerald" disabled={busy} type="submit" style={{ marginTop: '0.85rem' }}>
+          <Send size={14} /> Programar mensagem avulsa
+        </button>
       </form>
 
       {/* Bloco 4: Tabela de Follow-ups Ativos */}
