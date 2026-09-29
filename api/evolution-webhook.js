@@ -30,20 +30,45 @@ export default async function handler(req, res) {
     }
     const lead = leads.find((item) => normalizePhone(item.telefone) === inbound.phone);
     if (!lead) return res.status(200).json({ ignored: true, reason: 'lead_not_found' });
+    const now = new Date().toISOString();
+
+    // 1. Sempre atualiza a data da última resposta no cadastro do Lead
+    await updateRecord('leads', recordId(lead), { followup_ultima_resposta_em: now });
+
     const schedule = schedules.find((item) => (
       Number(item.lead_id) === recordId(lead)
       && item.status === 'ativo'
       && (item.cancelamento_por_resposta === true || item.cancelamento_por_resposta === 1 || item.cancelamento_por_resposta === 'true')
     ));
-    if (!schedule) return res.status(200).json({ ignored: true, reason: 'manual_cancellation_only' });
+    if (!schedule) {
+      return res.status(200).json({ acknowledged: true, updatedLead: true, reason: 'manual_cancellation_only' });
+    }
 
-    const now = new Date().toISOString();
+    // 2. Cancela o schedule recorrente
     await updateRecord('schedules', recordId(schedule), {
       status: 'cancelado',
       cancelado_em: now,
       atualizado_em: now,
     });
-    await updateRecord('leads', recordId(lead), leadFollowupProjection(schedule, false));
+
+    // 3. Atualiza projeção do lead como respondido
+    await updateRecord('leads', recordId(lead), {
+      ...leadFollowupProjection(schedule, false),
+      followup_status: 'respondido',
+      followup_ultima_resposta_em: now,
+    });
+
+    // 4. Cancela eventos agendados futuros deste lead para não disparar após a resposta
+    const pendingEvents = events.filter((e) => Number(e.lead_id) === recordId(lead) && e.status === 'agendado');
+    for (const pending of pendingEvents) {
+      await updateRecord('events', recordId(pending), {
+        status: 'cancelado',
+        erro: 'Cancelado automaticamente por resposta recebida do lead.',
+        executado_em: now,
+      });
+    }
+
+    // 5. Registra o evento de auditoria
     await createRecord('events', {
       schedule_id: recordId(schedule),
       lead_id: recordId(lead),
@@ -55,7 +80,8 @@ export default async function handler(req, res) {
       provedor_mensagem_id: inbound.providerMessageId,
       criado_em: now,
     });
-    return res.status(200).json({ cancelled: true, scheduleId: recordId(schedule) });
+
+    return res.status(200).json({ cancelled: true, scheduleId: recordId(schedule), leadId: recordId(lead) });
   } catch (error) {
     console.error('Evolution webhook error', error);
     if (error instanceof NocoDBConfigurationError) {
