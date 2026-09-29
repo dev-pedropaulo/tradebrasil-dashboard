@@ -33,5 +33,7 @@ describe('follow-up domain', () => {
 
   it('normalizes Brazilian phone digits', () => {
     expect(normalizePhone('+55 (43) 99999-0000')).toBe('5543999990000');
+    expect(normalizePhone('(43) 99999-0000')).toBe('5543999990000');
+    expect(normalizePhone('43999990000')).toBe('5543999990000');
   });
 });

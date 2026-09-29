@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { isValidLeadPhone, toEventRecord, toScheduleRecord } from './followupRecords.js';
 
 describe('follow-up records', () => {
-  it('accepts only Brazilian E.164 phone values for follow-ups', () => {
+  it('accepts Brazilian phones with or without 55 DDI prefix', () => {
     expect(isValidLeadPhone('+55 (43) 99999-0000')).toBe(true);
-    expect(isValidLeadPhone('43999990000')).toBe(false);
+    expect(isValidLeadPhone('(43) 99999-0000')).toBe(true);
+    expect(isValidLeadPhone('43999990000')).toBe(true);
+    expect(isValidLeadPhone('999990000')).toBe(false);
     expect(isValidLeadPhone('')).toBe(false);
   });
 

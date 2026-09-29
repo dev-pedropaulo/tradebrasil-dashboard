@@ -44,15 +44,28 @@ export async function listRecords(name, params = {}) {
 }
 
 export function createRecord(name, fields) {
+  const payload = { ...fields };
+  if (name !== 'leads' && !payload.id && !payload.Id) {
+    payload.id = Date.now();
+  }
   return request(`/api/v2/tables/${tableId(name)}/records`, {
     method: 'POST',
-    body: JSON.stringify(fields),
+    body: JSON.stringify(payload),
   });
 }
 
 export function updateRecord(name, id, fields) {
-  return request(`/api/v2/tables/${tableId(name)}/records/${id}`, {
+  const pk = Number(id);
+  return request(`/api/v2/tables/${tableId(name)}/records`, {
     method: 'PATCH',
-    body: JSON.stringify(fields),
+    body: JSON.stringify({ id: pk, Id: pk, ...fields }),
+  });
+}
+
+export function deleteRecord(name, id) {
+  const pk = Number(id);
+  return request(`/api/v2/tables/${tableId(name)}/records`, {
+    method: 'DELETE',
+    body: JSON.stringify({ id: pk, Id: pk }),
   });
 }

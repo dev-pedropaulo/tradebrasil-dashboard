@@ -1,5 +1,9 @@
-async function requestFollowups(action, { method = 'GET', body } = {}) {
-  const response = await fetch(`/api/followups?action=${encodeURIComponent(action)}`, {
+async function requestFollowups(action, { method = 'GET', body, id } = {}) {
+  const params = new URLSearchParams({ action });
+  if (id !== undefined && id !== null) {
+    params.set('id', String(id));
+  }
+  const response = await fetch(`/api/followups?${params.toString()}`, {
     method,
     headers: { 'Content-Type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -19,7 +23,7 @@ export function createFollowupTemplate(input) {
 }
 
 export function updateFollowupTemplate(id, input) {
-  return requestFollowups(`template&id=${encodeURIComponent(id)}`, { method: 'PATCH', body: input });
+  return requestFollowups('template', { method: 'PATCH', body: input, id });
 }
 
 export function createFollowupSchedule(input) {
@@ -31,5 +35,5 @@ export function scheduleOneOffMessage(input) {
 }
 
 export function cancelFollowupSchedule(id) {
-  return requestFollowups(`schedule&id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+  return requestFollowups('schedule', { method: 'DELETE', id });
 }

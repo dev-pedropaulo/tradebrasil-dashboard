@@ -1,7 +1,14 @@
 const BRAZIL_E164_LENGTHS = new Set([12, 13]);
 
 export function normalizePhone(value) {
-  return String(value || '').replace(/\D/g, '');
+  let digits = String(value || '').replace(/\D/g, '');
+  if (digits.length === 12 && digits.startsWith('0')) {
+    digits = digits.slice(1);
+  }
+  if (digits.length === 10 || digits.length === 11) {
+    digits = `55${digits}`;
+  }
+  return digits;
 }
 
 export function isValidLeadPhone(value) {
