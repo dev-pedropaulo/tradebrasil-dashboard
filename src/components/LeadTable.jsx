@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Search, Download, Eye, Phone } from 'lucide-react';
+import { Search, Download, Eye, Phone, CalendarCheck, Bot, MessageSquare, Clock } from 'lucide-react';
 
 export default function LeadTable({ leadsFormatted, onSelectLead }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterAtuacao, setFilterAtuacao] = useState('all');
   const [filterMomento, setFilterMomento] = useState('all');
   const [filterEstado, setFilterEstado] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('all');
 
   const states = Array.from(new Set(leadsFormatted.map(l => l.estado).filter(Boolean))).sort();
 
@@ -14,7 +15,8 @@ export default function LeadTable({ leadsFormatted, onSelectLead }) {
       (lead.nome && String(lead.nome).toLowerCase().includes(searchTerm.toLowerCase())) ||
       (lead.telefone && String(lead.telefone).includes(searchTerm)) ||
       (lead.id_meta && String(lead.id_meta).includes(searchTerm)) ||
-      (lead.estado && String(lead.estado).toLowerCase().includes(searchTerm.toLowerCase()));
+      (lead.estado && String(lead.estado).toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (lead.horarioAgendado && String(lead.horarioAgendado).toLowerCase().includes(searchTerm.toLowerCase()));
 
     const matchesAtuacao =
       filterAtuacao === 'all' ||
@@ -29,21 +31,27 @@ export default function LeadTable({ leadsFormatted, onSelectLead }) {
     const matchesEstado =
       filterEstado === 'all' || lead.estado === filterEstado;
 
-    return matchesSearch && matchesAtuacao && matchesMomento && matchesEstado;
+    const matchesStatus =
+      filterStatus === 'all' || lead.statusAtendimentoKey === filterStatus;
+
+    return matchesSearch && matchesAtuacao && matchesMomento && matchesEstado && matchesStatus;
   });
 
   const handleExportCSV = () => {
-    const headers = ['Id', 'Nome', 'Telefone', 'Estado', 'Atuacao', 'Cultura', 'Volume Safra', 'Volume Bois', 'Momento Protecao', 'ID Meta', 'Data Criacao'];
+    const headers = ['Id', 'Nome', 'Telefone', 'Estado', 'Status Atendimento', 'Horario Agendado', 'Atuacao', 'Cultura', 'Volume Safra', 'Volume Bois', 'Momento Protecao', 'Resumo Conversa IA', 'ID Meta', 'Data Criacao'];
     const rows = filteredLeads.map(l => [
       l.Id,
       `"${l.nome || ''}"`,
       `"${l.telefone || ''}"`,
       `"${l.estado || ''}"`,
+      `"${l.statusAtendimentoLabel || ''}"`,
+      `"${l.horarioAgendado || ''}"`,
       `"${l.atuacaoLabel || ''}"`,
       `"${l.culturaLabel || ''}"`,
       `"${l.volumeSafraLabel || ''}"`,
       `"${l.volumeBoisLabel || ''}"`,
       `"${l.momentoLabel || ''}"`,
+      `"${(l.resumoConversa || '').replace(/"/g, '""')}"`,
       `"${l.id_meta || ''}"`,
       `"${l.CreatedAt || ''}"`
     ]);
@@ -107,6 +115,16 @@ export default function LeadTable({ leadsFormatted, onSelectLead }) {
           <Search size={14} color="var(--text-muted)" style={{ position: 'absolute', left: '0.65rem', top: '50%', transform: 'translateY(-50%)' }} />
         </div>
 
+        {/* Filter Status Atendimento */}
+        <select className="clean-select" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+          <option value="all">Todos os Status</option>
+          <option value="agendado">📅 Reuniões Agendadas</option>
+          <option value="atendimento">🤖 Em Atendimento (SDR)</option>
+          <option value="respondido">💬 Responderam Follow-up</option>
+          <option value="followup">⏳ Em Cadência Follow-up</option>
+          <option value="novo">Novo Lead</option>
+        </select>
+
         {/* Filter Atuação */}
         <select className="clean-select" value={filterAtuacao} onChange={(e) => setFilterAtuacao(e.target.value)}>
           <option value="all">Todas as Atuações</option>
@@ -137,6 +155,7 @@ export default function LeadTable({ leadsFormatted, onSelectLead }) {
             <tr>
               <th>ID</th>
               <th>Produtor</th>
+              <th>Status Atendimento</th>
               <th>Telefone</th>
               <th>UF</th>
               <th>Setor / Cultura</th>
@@ -148,7 +167,7 @@ export default function LeadTable({ leadsFormatted, onSelectLead }) {
           <tbody>
             {filteredLeads.length === 0 ? (
               <tr>
-                <td colSpan={8} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                <td colSpan={9} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
                   Nenhum registro encontrado.
                 </td>
               </tr>
@@ -162,6 +181,35 @@ export default function LeadTable({ leadsFormatted, onSelectLead }) {
                   <td>
                     <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{lead.nome || 'Não informado'}</div>
                     <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>ID Meta: {lead.id_meta || 'N/A'}</div>
+                  </td>
+
+                  <td>
+                    {lead.isAgendado ? (
+                      <div>
+                        <span className="badge-clean badge-emerald" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                          <CalendarCheck size={11} /> Reunião Agendada
+                        </span>
+                        {lead.horarioAgendado && (
+                          <div style={{ fontSize: '0.68rem', color: '#34d399', marginTop: '0.2rem', fontWeight: 600 }}>
+                            {lead.horarioAgendado}
+                          </div>
+                        )}
+                      </div>
+                    ) : lead.isEmAtendimento ? (
+                      <span className="badge-clean badge-blue" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                        <Bot size={11} /> Em Atendimento
+                      </span>
+                    ) : lead.isRespondido ? (
+                      <span className="badge-clean badge-purple" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                        <MessageSquare size={11} /> Respondeu
+                      </span>
+                    ) : lead.hasFollowup ? (
+                      <span className="badge-clean badge-amber" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                        <Clock size={11} /> Follow-up #{lead.followup_ciclo_atual || 1}
+                      </span>
+                    ) : (
+                      <span className="badge-clean badge-neutral">Novo Lead</span>
+                    )}
                   </td>
 
                   <td>

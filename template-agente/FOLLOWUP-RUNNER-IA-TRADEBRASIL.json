@@ -1,0 +1,726 @@
+{
+  "name": "[TRADEBRASIL] Follow-up Runner com IA Dinâmica",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "f101-schedule-trigger",
+      "name": "Verificar a Cada Minuto",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://agentesn8n-nocodb.cqc86v.easypanel.host/api/v2/tables/mup88e2fr0xy173/records",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "where",
+              "value": "=(status,eq,agendado)~and(agendado_para,le,exactDate,{{ $now.setZone(\"UTC\").toFormat(\"yyyy-MM-dd HH:mm:ss\") }})"
+            },
+            {
+              "name": "limit",
+              "value": "25"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "xc-token",
+              "value": "MAzqioK1wEs1N3cqgaE9yJIQ0RDloKhrZx7oW3fG"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f102-buscar-eventos",
+      "name": "Buscar Eventos Vencidos",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        320,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.first().json.list || [];\nif (items.length === 0) {\n  return [];\n}\nreturn items.map(ev => ({ json: ev }));"
+      },
+      "id": "f103-extrair-lista",
+      "name": "Extrair Lista de Eventos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        540,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "f104-loop",
+      "name": "Loop Sobre Eventos",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        760,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://agentesn8n-nocodb.cqc86v.easypanel.host/api/v2/tables/m6zmneu2vrp2vz5/records/{{ $json.lead_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "xc-token",
+              "value": "MAzqioK1wEs1N3cqgaE9yJIQ0RDloKhrZx7oW3fG"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f105-buscar-lead",
+      "name": "Buscar Lead no NocoDB",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        980,
+        420
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const lead = $input.first().json || {};\nconst evento = $('Loop Sobre Eventos').item.json;\n\n// Validações\nconst telefoneValido = Boolean(lead.telefone && String(lead.telefone).replace(/\\D/g, '').length >= 10);\nconst jaRespondeu = lead.followup_status === 'respondido';\nconst emAtendimento = lead.em_atendimento === true || lead.em_atendimento === 1;\nconst aguardandoEspecialista = lead.aguardando_especialista === true || lead.aguardando_especialista === 1;\n\nconst elegivel = telefoneValido && !jaRespondeu && !emAtendimento && !aguardandoEspecialista;\n\nlet motivoIneligivel = '';\nif (!telefoneValido) motivoIneligivel = 'Telefone inválido ou ausente';\nelse if (jaRespondeu) motivoIneligivel = 'Lead já respondeu anteriormente';\nelse if (emAtendimento) motivoIneligivel = 'Lead já em atendimento ativo com SDR';\nelse if (aguardandoEspecialista) motivoIneligivel = 'Lead já agendado com especialista';\n\nreturn [{\n  json: {\n    elegivel,\n    motivoIneligivel,\n    evento,\n    lead: {\n      id: lead.Id,\n      nome: lead.nome || 'Produtor',\n      primeiro_nome: (lead.nome || 'Produtor').split(' ')[0],\n      telefone: String(lead.telefone || '').replace(/\\D/g, ''),\n      cultura_principal: lead.cultura_principal || 'Soja e Milho',\n      volume_safra: lead.volume_safra || '',\n      volume_bois: lead.volume_bois || '',\n      estado: lead.estado || 'sua região',\n      resumo_conversa: lead.resumo_conversa || '',\n      ultimo_envio: lead.followup_ultimo_envio_em || null\n    }\n  }\n}];"
+      },
+      "id": "f106-validar-elegibilidade",
+      "name": "Validar Elegibilidade",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.elegivel }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f107-if-elegivel",
+      "name": "Lead Elegivel?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1420,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "https://agentesn8n-nocodb.cqc86v.easypanel.host/api/v2/tables/mup88e2fr0xy173/records",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "xc-token",
+              "value": "MAzqioK1wEs1N3cqgaE9yJIQ0RDloKhrZx7oW3fG"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"Id\": {{ $json.evento.Id }},\n  \"status\": \"cancelado\",\n  \"erro\": \"Cancelado automaticamente: {{ $json.motivoIneligivel }}\",\n  \"executado_em\": \"{{ $now.setZone('UTC').toFormat('yyyy-MM-dd HH:mm:ss') }}\"\n}",
+        "options": {}
+      },
+      "id": "f108-cancelar-evento",
+      "name": "Marcar Evento Cancelado",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1640,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst lead = data.lead;\nconst ev = data.evento;\n\nconst promptSistema = `Você é o Consultor de Relacionamento da TradeBrasil Agro (mesa de operações agrícolas e proteção de safra / hedge).\n\nSua missão é gerar uma mensagem ÚNICA, CURTA e INÉDITA de WhatsApp (máximo 2 a 3 frases) para follow-up com este produtor rural.\n\nDIRETRIZES FUNDAMENTAIS:\n1. Comece de forma natural e amigável: \"Oi ${lead.primeiro_nome}!\" ou \"Olá ${lead.primeiro_nome}, tudo bem?\".\n2. Conecte com a realidade dele: ele produz ${lead.cultura_principal} em ${lead.estado}${lead.volume_safra ? ' com volume de ' + lead.volume_safra : ''}.\n3. Traga um gancho atual de mercado: oscilação recente de preços na bolsa (B3/Chicago), dólar, momento de garantir os custos de produção da safra ou relação de troca em insumos.\n4. NUNCA envie termos técnicos de robô, nem tente fechar contrato por mensagem.\n5. Finalize convidando para uma ligação rápida de 5 minutos com o consultor da mesa de operações para tirar dúvidas ou fazer uma simulação de trava sem compromisso.\n6. Responda EXCLUSIVAMENTE o texto puro da mensagem de WhatsApp, sem aspas, sem explicações e sem tags de código.`;\n\nconst promptUsuario = `PRODUTOR:\nNome: ${lead.nome}\nCultura: ${lead.cultura_principal}\nEstado: ${lead.estado}\nVolume: ${lead.volume_safra || lead.volume_bois || 'Não informado'}\nÚltimo contato: ${lead.ultimo_envio || 'Primeiro contato da cadência'}\nHistórico anterior: ${lead.resumo_conversa || 'Nenhum'}`;\n\nreturn [{\n  json: {\n    ...data,\n    prompt_sistema: promptSistema,\n    prompt_usuario: promptUsuario\n  }\n}];"
+      },
+      "id": "f109-prep-ai-prompt",
+      "name": "Preparar Prompt IA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1640,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.prompt_usuario }}",
+        "options": {
+          "systemMessage": "={{ $json.prompt_sistema }}"
+        }
+      },
+      "id": "f110-ai-generate",
+      "name": "Gerar Mensagem com IA",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.5,
+      "position": [
+        1860,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o",
+          "mode": "list",
+          "cachedResultName": "gpt-4o"
+        },
+        "options": {
+          "temperature": 0.7
+        }
+      },
+      "id": "f110b-openai-model",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        1860,
+        560
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "O15aNB3icNpWMpEK",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const aiRaw = $input.first().json.text || '';\nconst prevData = $('Preparar Prompt IA').first().json;\n\nlet cleanedMessage = aiRaw\n  .replace(/^[\"']|[\"']$/g, '')\n  .replace(/^\\x60\\x60\\x60json\\s*/im, '')\n  .replace(/^\\x60\\x60\\x60\\s*/im, '')\n  .replace(/\\s*\\x60\\x60\\x60$/m, '')\n  .trim();\n\n// Se por algum motivo a IA cuspiu JSON com campo mensagem_whatsapp\ntry {\n  const jsonMatch = cleanedMessage.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    const parsed = JSON.parse(jsonMatch[0]);\n    if (parsed.mensagem_whatsapp) cleanedMessage = parsed.mensagem_whatsapp;\n  }\n} catch(e) {}\n\nreturn [{\n  json: {\n    ...prevData,\n    mensagem_gerada: cleanedMessage\n  }\n}];"
+      },
+      "id": "f111-limpar-msg",
+      "name": "Limpar Mensagem IA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2100,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://agentesn8n-evolution.cqc86v.easypanel.host/message/sendText/Trade%20Brasil",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "429683C4C977415CAAFCCE10F7D57E11"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"number\": \"{{ $json.lead.telefone }}\",\n  \"text\": \"{{ $json.mensagem_gerada }}\",\n  \"delay\": 1500\n}",
+        "options": {}
+      },
+      "id": "f112-enviar-evolution",
+      "name": "Enviar WhatsApp Evolution",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2320,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "https://agentesn8n-nocodb.cqc86v.easypanel.host/api/v2/tables/mup88e2fr0xy173/records",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "xc-token",
+              "value": "MAzqioK1wEs1N3cqgaE9yJIQ0RDloKhrZx7oW3fG"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"Id\": {{ $('Limpar Mensagem IA').item.json.evento.Id }},\n  \"status\": \"concluido\",\n  \"mensagem\": \"{{ $('Limpar Mensagem IA').item.json.mensagem_gerada.replace(/\"/g, '\\\\\"').replace(/\\n/g, '\\\\n') }}\",\n  \"executado_em\": \"{{ $now.setZone('UTC').toFormat('yyyy-MM-dd HH:mm:ss') }}\",\n  \"provedor_mensagem_id\": \"{{ $json.key?.id || '' }}\"\n}",
+        "options": {}
+      },
+      "id": "f113-concluir-evento",
+      "name": "Concluir Evento no NocoDB",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2540,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $('Limpar Mensagem IA').first().json;\nconst evento = data.evento;\nconst lead = data.lead;\n\nconst scheduleId = evento.schedule_id;\nconst isRecorrente = Boolean(scheduleId && evento.tipo === 'recorrente');\n\nreturn [{\n  json: {\n    scheduleId,\n    isRecorrente,\n    leadId: lead.id,\n    eventoId: evento.Id\n  }\n}];"
+      },
+      "id": "f114-calc-recorrencia",
+      "name": "Checar Recorrência",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2760,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c2",
+              "leftValue": "={{ $json.isRecorrente }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f115-if-recorrente",
+      "name": "É Recorrente?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2980,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://agentesn8n-nocodb.cqc86v.easypanel.host/api/v2/tables/mjhru5cshwinth6/records/{{ $json.scheduleId }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "xc-token",
+              "value": "MAzqioK1wEs1N3cqgaE9yJIQ0RDloKhrZx7oW3fG"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f116-buscar-schedule",
+      "name": "Buscar Schedule",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://agentesn8n-nocodb.cqc86v.easypanel.host/api/v2/tables/mup88e2fr0xy173/records",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "xc-token",
+              "value": "MAzqioK1wEs1N3cqgaE9yJIQ0RDloKhrZx7oW3fG"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"schedule_id\": {{ $json.Id }},\n  \"lead_id\": {{ $json.lead_id }},\n  \"tipo\": \"recorrente\",\n  \"status\": \"agendado\",\n  \"agendado_para\": \"{{ $now.setZone('UTC').plus({ days: Number($json.recorrencia_dias || 30) }).toFormat('yyyy-MM-dd HH:mm:ss') }}\",\n  \"criado_em\": \"{{ $now.setZone('UTC').toFormat('yyyy-MM-dd HH:mm:ss') }}\"\n}",
+        "options": {}
+      },
+      "id": "f117-criar-proximo-evento",
+      "name": "Agendar Próximo Evento",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3420,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "https://agentesn8n-nocodb.cqc86v.easypanel.host/api/v2/tables/mjhru5cshwinth6/records",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "xc-token",
+              "value": "MAzqioK1wEs1N3cqgaE9yJIQ0RDloKhrZx7oW3fG"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"Id\": {{ $('Buscar Schedule').item.json.Id }},\n  \"proximo_envio_em\": \"{{ $now.setZone('UTC').plus({ days: Number($('Buscar Schedule').item.json.recorrencia_dias || 30) }).toFormat('yyyy-MM-dd HH:mm:ss') }}\",\n  \"atualizado_em\": \"{{ $now.setZone('UTC').toFormat('yyyy-MM-dd HH:mm:ss') }}\"\n}",
+        "options": {}
+      },
+      "id": "f118-atualizar-schedule",
+      "name": "Atualizar Schedule",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3640,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "https://agentesn8n-nocodb.cqc86v.easypanel.host/api/v2/tables/m6zmneu2vrp2vz5/records",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "xc-token",
+              "value": "MAzqioK1wEs1N3cqgaE9yJIQ0RDloKhrZx7oW3fG"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"Id\": {{ $('Buscar Schedule').item.json.lead_id }},\n  \"followup_ultimo_envio_em\": \"{{ $now.setZone('UTC').toFormat('yyyy-MM-dd HH:mm:ss') }}\",\n  \"followup_proximo_envio_em\": \"{{ $now.setZone('UTC').plus({ days: Number($('Buscar Schedule').item.json.recorrencia_dias || 30) }).toFormat('yyyy-MM-dd HH:mm:ss') }}\"\n}",
+        "options": {}
+      },
+      "id": "f119-atualizar-lead",
+      "name": "Atualizar Projeção Lead",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3860,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Verificar a Cada Minuto": {
+      "main": [
+        [
+          {
+            "node": "Buscar Eventos Vencidos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Eventos Vencidos": {
+      "main": [
+        [
+          {
+            "node": "Extrair Lista de Eventos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extrair Lista de Eventos": {
+      "main": [
+        [
+          {
+            "node": "Loop Sobre Eventos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Sobre Eventos": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Buscar Lead no NocoDB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Lead no NocoDB": {
+      "main": [
+        [
+          {
+            "node": "Validar Elegibilidade",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar Elegibilidade": {
+      "main": [
+        [
+          {
+            "node": "Lead Elegivel?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lead Elegivel?": {
+      "main": [
+        [
+          {
+            "node": "Preparar Prompt IA",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Marcar Evento Cancelado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marcar Evento Cancelado": {
+      "main": [
+        [
+          {
+            "node": "Loop Sobre Eventos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Prompt IA": {
+      "main": [
+        [
+          {
+            "node": "Gerar Mensagem com IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Gerar Mensagem com IA",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gerar Mensagem com IA": {
+      "main": [
+        [
+          {
+            "node": "Limpar Mensagem IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limpar Mensagem IA": {
+      "main": [
+        [
+          {
+            "node": "Enviar WhatsApp Evolution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar WhatsApp Evolution": {
+      "main": [
+        [
+          {
+            "node": "Concluir Evento no NocoDB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Concluir Evento no NocoDB": {
+      "main": [
+        [
+          {
+            "node": "Checar Recorrência",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Checar Recorrência": {
+      "main": [
+        [
+          {
+            "node": "É Recorrente?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "É Recorrente?": {
+      "main": [
+        [
+          {
+            "node": "Buscar Schedule",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Sobre Eventos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Schedule": {
+      "main": [
+        [
+          {
+            "node": "Agendar Próximo Evento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agendar Próximo Evento": {
+      "main": [
+        [
+          {
+            "node": "Atualizar Schedule",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Atualizar Schedule": {
+      "main": [
+        [
+          {
+            "node": "Atualizar Projeção Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Atualizar Projeção Lead": {
+      "main": [
+        [
+          {
+            "node": "Loop Sobre Eventos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Sao_Paulo"
+  }
+}

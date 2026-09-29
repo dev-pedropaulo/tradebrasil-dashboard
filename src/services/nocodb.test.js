@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fetchNocoDBLeads } from './nocodb';
+import { fetchNocoDBLeads, formatLeadData } from './nocodb';
 
 describe('lead API client', () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -25,5 +25,31 @@ describe('lead API client', () => {
 
     expect(result.data).toEqual([]);
     expect(result.isLive).toBe(false);
+  });
+
+  it('formats lead data with SDR agent fields and scheduling status', () => {
+    const leadScheduled = formatLeadData({
+      Id: 101,
+      nome: 'Pedro Paulo',
+      aguardando_especialista: true,
+      horario_agendado: 'Quarta-feira às 14h',
+      resumo_conversa: 'Produtor de soja em MG interessado em travar safra',
+    });
+
+    expect(leadScheduled.isAgendado).toBe(true);
+    expect(leadScheduled.statusAtendimentoKey).toBe('agendado');
+    expect(leadScheduled.statusAtendimentoLabel).toBe('Reunião Agendada');
+    expect(leadScheduled.horarioAgendado).toBe('Quarta-feira às 14h');
+    expect(leadScheduled.resumoConversa).toContain('Produtor de soja');
+
+    const leadInCare = formatLeadData({
+      Id: 102,
+      nome: 'Carlos Fazenda',
+      em_atendimento: true,
+    });
+
+    expect(leadInCare.isEmAtendimento).toBe(true);
+    expect(leadInCare.statusAtendimentoKey).toBe('atendimento');
+    expect(leadInCare.statusAtendimentoLabel).toBe('Em Atendimento (SDR)');
   });
 });

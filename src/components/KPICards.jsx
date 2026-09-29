@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users, DollarSign, Flame, Wheat } from 'lucide-react';
+import { Users, Flame, CalendarCheck, Bot } from 'lucide-react';
 
 export default function KPICards({ leadsFormatted, portfolioStats }) {
   const safeLeads = Array.isArray(leadsFormatted) ? leadsFormatted : [];
@@ -7,9 +7,8 @@ export default function KPICards({ leadsFormatted, portfolioStats }) {
   const hotLeadsCount = safeLeads.filter(l => l && l.isHot).length;
   const hotLeadsPercent = totalLeads > 0 ? Math.round((hotLeadsCount / totalLeads) * 100) : 0;
 
-  const totalValorR$ = portfolioStats ? portfolioStats.totalExposicaoR$ : 0;
-  const totalSacas = portfolioStats ? portfolioStats.totalSacasGeral : 0;
-  const totalBois = portfolioStats ? portfolioStats.totalBois : 0;
+  const agendadosCount = safeLeads.filter(l => l && l.isAgendado).length;
+  const atendimentoCount = safeLeads.filter(l => l && (l.isEmAtendimento || l.isRespondido)).length;
 
   const cards = [
     {
@@ -19,6 +18,22 @@ export default function KPICards({ leadsFormatted, portfolioStats }) {
       icon: Users,
       badge: `${hotLeadsPercent}% Quentes`,
       badgeClass: "badge-emerald"
+    },
+    {
+      title: "Reuniões Agendadas",
+      value: agendadosCount.toString(),
+      subtitle: "Aguardando ligação da mesa",
+      icon: CalendarCheck,
+      badge: agendadosCount > 0 ? "Prioridade Mesa" : "Em Prospecção",
+      badgeClass: agendadosCount > 0 ? "badge-emerald" : "badge-neutral"
+    },
+    {
+      title: "Em Atendimento SDR (IA)",
+      value: atendimentoCount.toString(),
+      subtitle: "Interagindo no WhatsApp",
+      icon: Bot,
+      badge: "WhatsApp Ativo",
+      badgeClass: "badge-blue"
     },
     {
       title: "Prontidão (Hot Leads)",

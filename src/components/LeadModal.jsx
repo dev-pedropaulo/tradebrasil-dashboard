@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, User, Phone, ShieldCheck, MessageSquare, Calculator } from 'lucide-react';
+import { X, User, Phone, ShieldCheck, MessageSquare, Calculator, CalendarCheck, Sparkles, Bot, Clock } from 'lucide-react';
 import { COMMODITY_QUOTES } from '../services/marketData';
 
 export default function LeadModal({ lead, onClose, onSimulateHedge }) {
@@ -25,7 +25,7 @@ export default function LeadModal({ lead, onClose, onSimulateHedge }) {
   }
 
   const phoneClean = lead.telefone ? lead.telefone.replace(/\D/g, '') : '';
-  const waUrl = phoneClean ? `https://wa.me/${phoneClean}?text=Olá%20${encodeURIComponent(lead.nome || '')},%20sou%20da%20Brasil%20Trade%20Agro!` : '#';
+  const waUrl = phoneClean ? `https://wa.me/${phoneClean}?text=Olá%20${encodeURIComponent(lead.nome || '')},%20sou%20da%20TradeBrasil%20Agro!` : '#';
 
   return (
     <div style={{
@@ -43,20 +43,25 @@ export default function LeadModal({ lead, onClose, onSimulateHedge }) {
       padding: '1rem'
     }}>
       <div className="clean-card" style={{
-        maxWidth: '540px',
+        maxWidth: '560px',
         width: '100%',
+        maxHeight: '90vh',
+        overflowY: 'auto',
         padding: '1.5rem',
         background: 'var(--bg-card)'
       }}>
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '1rem' }}>
           <div>
-            <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.1rem', fontWeight: 800 }}>
+            <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.15rem', fontWeight: 800 }}>
               {lead.nome || 'Produtor Sem Nome'}
             </h2>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.2rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.25rem' }}>
               <span className="badge-clean badge-neutral">ID #{lead.Id}</span>
               <span className="badge-clean badge-neutral">{lead.estado || 'UF N/I'}</span>
+              <span className={`badge-clean ${lead.statusAtendimentoBadgeClass}`}>
+                {lead.statusAtendimentoLabel}
+              </span>
               {lead.isHot ? (
                 <span className="badge-clean badge-emerald">Pronto</span>
               ) : (
@@ -111,6 +116,55 @@ export default function LeadModal({ lead, onClose, onSimulateHedge }) {
             </div>
           </div>
         </div>
+
+        {/* Reunião Agendada com a Mesa */}
+        {lead.isAgendado && (
+          <div style={{
+            background: 'rgba(16, 185, 129, 0.08)',
+            border: '1px solid rgba(16, 185, 129, 0.3)',
+            borderRadius: 'var(--radius-sm)',
+            padding: '0.85rem',
+            marginBottom: '0.85rem'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#34d399', fontWeight: 700, fontSize: '0.85rem' }}>
+                <CalendarCheck size={16} /> Reunião com a Mesa Agendada
+              </div>
+              <span className="badge-clean badge-emerald">Prioridade Alta</span>
+            </div>
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-primary)', marginTop: '0.2rem' }}>
+              <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>Horário Combinado: </span>
+              <strong>{lead.horarioAgendado || 'A definir com o produtor'}</strong>
+            </div>
+          </div>
+        )}
+
+        {/* Resumo da Conversa com IA */}
+        {lead.resumoConversa && (
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.03)',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: 'var(--radius-sm)',
+            padding: '0.85rem',
+            marginBottom: '0.85rem'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '0.75rem', marginBottom: '0.35rem' }}>
+              <Sparkles size={13} color="var(--accent-emerald)" /> Resumo da Conversa (SDR IA)
+            </div>
+            <p style={{
+              fontSize: '0.8rem',
+              color: 'var(--text-primary)',
+              lineHeight: 1.45,
+              margin: 0,
+              whiteSpace: 'pre-wrap',
+              background: 'rgba(0, 0, 0, 0.2)',
+              padding: '0.6rem 0.75rem',
+              borderRadius: '4px'
+            }}>
+              {lead.resumoConversa}
+            </p>
+          </div>
+        )}
 
         {/* Financial Exposure Card */}
         <div style={{

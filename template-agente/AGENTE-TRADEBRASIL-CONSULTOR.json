@@ -1,0 +1,1451 @@
+{
+  "name": "[TRADEBRASIL] Agente Consultor de Relacionamento",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "sdr-tradebrasil",
+        "options": {}
+      },
+      "id": "4ff0fb16-552f-4659-ba84-75effa6b3bc2",
+      "name": "Receber Mensagem WhatsApp",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -880,
+        416
+      ],
+      "webhookId": "adfa7674-8120-4799-9047-df911f9513d6"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\n\n// Se já veio processado (caminho do áudio)\nif (input.phone && input.message) {\n  return [{ json: input }];\n}\n\n// Caminho texto: processa o webhook bruto\nconst body = (input.body) || {};\nconst data = body.data || {};\nconst key = data.key || {};\nconst remoteJid = key.remoteJid || '';\nconst fromMe = key.fromMe || false;\n\nif (fromMe) return [];\n\nconst phone = remoteJid.split('@')[0].replace(/[^0-9]/g, '');\nif (!phone) return [];\n\nconst msgData = data.message || {};\nconst message = input.merged_message\n  || msgData.conversation\n  || (msgData.extendedTextMessage && msgData.extendedTextMessage.text)\n  || '';\n\nif (!message.trim()) {\n  console.log('[TradeBrasil] Descartando mensagem vazia para phone=' + phone);\n  return [];\n}\n\nreturn [{\n  json: {\n    phone: phone,\n    pushName: data.pushName || '',\n    message: message.trim(),\n    instance: body.instance || '',\n    timestamp: new Date().toISOString(),\n    isAudio: false,\n    config: {\n      evolution_url: 'https://agentesn8n-evolution.cqc86v.easypanel.host',\n      evolution_instance: 'Trade%20Brasil',\n      dashboard_webhook_url: 'https://tradebrasil-dashboard.vercel.app/api/evolution-webhook',\n      dashboard_webhook_secret: 'tradebrasil_evolution_secret_2026'\n    }\n  }\n}];\n"
+      },
+      "id": "055a91ab-a892-4065-b6cc-d89a77a24e21",
+      "name": "Inicializar e Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1696,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "nocoDbApiToken",
+        "operation": "getAll",
+        "projectId": "pqidm66rx0b1wjb",
+        "table": "m6zmneu2vrp2vz5",
+        "returnAll": true,
+        "options": {
+          "where": "=(telefone,eq,{{ $json.phone.toString().replace(/^(55\\d{2})(\\d{8})$/, '$19$2') }})"
+        }
+      },
+      "id": "4bd22d10-b08f-4af6-b52a-b9517b3ee6f3",
+      "name": "Buscar Lead NocoDB",
+      "type": "n8n-nodes-base.nocoDb",
+      "typeVersion": 3,
+      "position": [
+        1936,
+        320
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "nocoDbApiToken": {
+          "id": "tvXnAQ6fV0Cg8Bvw",
+          "name": "NocoDB Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst init = $('Inicializar e Config').first().json;\nconst lead = (items.length > 0 && items[0].json && items[0].json.Id) ? items[0].json : null;\n\nlet historico = [];\ntry { if (lead && lead.resumo_conversa) historico = [{ role: 'assistant', content: lead.resumo_conversa }]; } catch(e) { historico = []; }\n\nconst dados_qual = {\n  cultura_principal: lead ? (lead.cultura_principal || null) : null,\n  volume_safra:      lead ? (lead.volume_safra || null) : null,\n  volume_bois:       lead ? (lead.volume_bois || null) : null,\n  estado:            lead ? (lead.estado || null) : null,\n  momento_protecao:  lead ? (lead.momento_protecao || null) : null,\n  horario_agendado:  lead ? (lead.horario_agendado || null) : null\n};\n\nconst leadNome = lead ? (lead.nome || init.pushName || '') : (init.pushName || '');\n\nreturn [{json: {\n  phone: init.phone,\n  pushName: init.pushName,\n  lead_first_name: leadNome.split(' ')[0] || '',\n  lead_nome_completo: leadNome,\n  message: init.message,\n  config: init.config,\n  timestamp: init.timestamp,\n  lead_exists: lead !== null,\n  lead_id: lead ? lead.Id : null,\n  historico: historico,\n  dados_qualificacao: dados_qual,\n  aguardando_especialista: lead ? (lead.aguardando_especialista === true || lead.aguardando_especialista === 1) : false,\n  horario_agendado: lead ? lead.horario_agendado : null,\n  resumo_conversa: lead ? lead.resumo_conversa : null\n}}];\n"
+      },
+      "id": "1d74a9fb-6358-4a92-8e10-4a1ebe7ce32a",
+      "name": "Preparar Contexto Lead",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2160,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.lead_exists }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              },
+              "rightValue": "",
+              "id": "b8cbd674-ad1d-47ba-966b-32c573882422"
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "813b207c-ed13-4af1-9545-addd812b2635",
+      "name": "Lead Existe?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2416,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx = $input.first().json;\n\nconst dadosColetados = Object.entries(ctx.dados_qualificacao || {})\n  .filter(function(e) { return e[1] !== null && e[1] !== undefined && e[1] !== ''; })\n  .map(function(e) { return e[0] + ': ' + e[1]; })\n  .join(', ') || 'nenhum dado prévio registrado';\n\nconst conversaEmAndamento = Boolean(ctx.resumo_conversa || ctx.em_atendimento);\n\nconst contexto_sistema = '[CONTEXTO ATUAL DO PRODUTOR]\\n'\n  + 'Nome: ' + (ctx.lead_first_name || 'Produtor') + '\\n'\n  + 'Telefone: ' + ctx.phone + '\\n'\n  + 'Dados já conhecidos: ' + dadosColetados + '\\n'\n  + 'Status do diálogo: ' + (conversaEmAndamento \n      ? 'CONVERSA EM ANDAMENTO (NÃO repita saudações como \"Oi [Nome]\" ou \"Olá\", vá direto ao ponto com naturalidade)' \n      : 'PRIMEIRO CONTATO (saúde pelo nome com simpatia)') + '\\n'\n  + (ctx.horario_agendado ? ('Horário já agendado anteriormente: ' + ctx.horario_agendado + '\\n') : '')\n  + (ctx.resumo_conversa ? ('Resumo anterior: ' + ctx.resumo_conversa + '\\n') : '');\n\nreturn [{json: Object.assign({}, ctx, {\n  contexto_sistema: contexto_sistema\n})}];\n"
+      },
+      "id": "3206446b-445a-4ef2-8d59-afcfbeb7e501",
+      "name": "Preparar Input Agente",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3152,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "nocoDbApiToken",
+        "operation": "create",
+        "projectId": "pqidm66rx0b1wjb",
+        "table": "m6zmneu2vrp2vz5",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldName": "nome",
+              "fieldValue": "={{ $json.pushName || \"Produtor\" }}"
+            },
+            {
+              "fieldName": "telefone",
+              "fieldValue": "={{ $json.phone }}"
+            },
+            {
+              "fieldName": "em_atendimento",
+              "fieldValue": "true"
+            }
+          ]
+        }
+      },
+      "id": "33ca2613-3f94-458f-b2d8-94aff165af3e",
+      "name": "Criar Lead NocoDB",
+      "type": "n8n-nodes-base.nocoDb",
+      "typeVersion": 3,
+      "position": [
+        2672,
+        432
+      ],
+      "credentials": {
+        "nocoDbApiToken": {
+          "id": "tvXnAQ6fV0Cg8Bvw",
+          "name": "NocoDB Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const novoLead = $input.first().json;\nconst ctx = $('Preparar Contexto Lead').first().json;\nreturn [{json: Object.assign({}, ctx, { lead_id: novoLead.Id, lead_exists: true })}];"
+      },
+      "id": "d1f29d8b-ab04-4d47-8c0f-7baee537f724",
+      "name": "Definir ID Lead Criado",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2912,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.contexto_sistema }}\n\nMensagem recebida do produtor:\n{{ $json.message }}",
+        "options": {
+          "systemMessage": "Você é o **Consultor de Relacionamento da TradeBrasil Agro** (mesa de operações e proteção de safra / hedge agrícola).\n\n---\n\n### IDENTIDADE E TOM\n- Você conversa diretamente com produtores rurais (grãos, soja, milho, pecuária de corte/boi gordo, café).\n- Seu tom é **respeitoso, humano, acolhedor e profissional** (linguagem prática do campo: safra, saca, arroba, trava de preço, Chicago, dólar, colheita, custo de produção).\n- **NUNCA** pareça um robô. Escreva mensagens curtas (1 a 3 frases no máximo), como se estivesse digitando no WhatsApp.\n- Nunca use jargões como \"lead\", \"SDR\", \"qualificação\", \"CRM\", \"funil\".\n- **REGRA ABSOLUTA:** Você está no WhatsApp com o produtor. NUNCA diga frases como \"parece que houve um erro\", \"erro no sistema\" ou peça detalhes técnicos.\n\n---\n\n### REGRA DE OURO: SAUDAÇÕES E NATURALIDADE DO DIÁLOGO\n- **PRIMEIRO CONTATO:** Use a saudação (\"Olá, [Nome]!\", \"Oi [Nome], tudo bem?\") **APENAS** na primeira mensagem da conversa ou se o produtor acabou de mandar um \"oi/bom dia\" inicial.\n- **CONVERSA EM ANDAMENTO (MENSAGENS SEGUINTES):** **NUNCA repita saudações** como \"Oi [Nome]!\", \"Olá!\", \"Tudo bem?\". Isso soa extremamente robótico e repetitivo.\n  - Vá **DIRETO AO PONTO**, reagindo naturalmente ao que o produtor acabou de dizer.\n  - *Exemplo errado:* \"Oi Pedro! Entendo suas dúvidas...\"\n  - *Exemplo correto:* \"Entendo perfeitamente suas dúvidas. Funciona assim: a TradeBrasil cuida de toda a parte operacional da mesa e traduz tudo para você de forma simples...\"\n  - *Exemplo correto:* \"Com certeza! Essa é uma excelente pergunta...\"\n- **Uso do nome do produtor:** Use com moderação, no máximo 1 vez a cada 3 mensagens. Nunca comece toda mensagem chamando pelo nome.\n\n---\n\n### OBJETIVO PRINCIPAL (MISSÃO)\nSeu objetivo **NÃO** é fechar contratos nem passar taxas complexas pelo WhatsApp.\nSua meta é:\n1. **Acolher o produtor** com simpatia e respeito.\n2. **Aproveitar as informações já existentes** no `[CONTEXTO ATUAL DO PRODUTOR]` (se já souber o nome, cultura, estado ou volume, não pergunte de novo; mencione com naturalidade).\n3. **Entender a expectativa dele** sobre a safra/mercado atual.\n4. **Propor uma conversa rápida por telefone (5 a 10 minutos)** com um consultor da mesa de operações para avaliar opções de trava e proteção de preço sem compromisso.\n5. **Coletar o melhor dia/horário** para o consultor ligar.\n\n---\n\n### COMO CONDUZIR CONFORME A MENSAGEM DO PRODUTOR\n\n#### 1. Saudação Inicial (Ex: \"Olá, bom dia\", \"Oi\", \"Tudo bem?\")\n- Se for a primeira mensagem da conversa:\n  *Se o contexto já tiver cultura e estado:*\n  \"Olá, [Nome]! Bom dia, tudo bem? Aqui é da TradeBrasil Agro. Vi que você mexe com [Cultura] aí em [Estado]. Como estão os planos para travar parte da safra e garantir o custo de produção?\"\n  *Se ainda não tiver os dados:*\n  \"Olá, [Nome]! Bom dia, tudo bem? Aqui é da TradeBrasil Agro. Ajudamos produtores a protegerem seus custos e garantirem preços na venda de grãos e boi gordo. O que você costuma produzir aí na sua região?\"\n\n#### 2. Dúvidas sobre o serviço, mercado ou hesitação (Conversa em andamento)\n- **NÃO use \"Oi [Nome]\" de novo.** Vá direto:\n  \"Entendo perfeitamente. A gente cuida de toda a parte da mesa de operações para você não precisar operar na bolsa nem se preocupar com telas. Nosso especialista pode te dar uma ligada rápida de 5 minutinhos para te mostrar como funciona na prática, sem custo ou compromisso nenhum. Qual horário você costuma estar mais livre hoje ou amanhã?\"\n\n#### 3. Quando o produtor aceitar a ligação ou passar um horário\n- Confirme calorosamente:\n  \"Perfeito! Já deixei combinado aqui com nosso especialista para te ligar [dia/horário]. Muito obrigado e um grande abraço!\"\n- Marque `aguardando_especialista: true` e preencha `horario_agendado`.\n\n---\n\n### FORMATO DE RESPOSTA (OBRIGATÓRIO)\nResponda EXCLUSIVAMENTE em formato JSON válido, sem texto antes ou depois:\n\n```json\n{\n  \"mensagem_whatsapp\": \"Texto curto para enviar ao produtor pelo WhatsApp\",\n  \"novos_dados\": {\n    \"cultura_principal\": \"Soja\",\n    \"volume_safra\": \"40.000 sacas\",\n    \"volume_bois\": null,\n    \"estado\": \"MT\"\n  },\n  \"aguardando_especialista\": false,\n  \"horario_agendado\": \"Amanhã às 14h\",\n  \"resumo_conversa\": \"Produtor de soja em MT com 40k sacas, quer avaliar trava para cobrir custos de adubo.\"\n}\n```\n\n- `aguardando_especialista`: `true` somente se o produtor aceitou ou combinou a ligação com o consultor.\n- `horario_agendado`: o horário ou turno combinado (ex: \"hoje às 16h\", \"amanhã cedo\"), ou null.\n- `resumo_conversa`: breve resumo de 1 ou 2 linhas sobre o perfil e objetivo do produtor para orientar o consultor na hora de ligar.\n"
+        }
+      },
+      "id": "c2372b47-0b03-4138-8730-bfd9747b12ff",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        3392,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o",
+          "mode": "list",
+          "cachedResultName": "gpt-4o"
+        },
+        "builtInTools": {},
+        "options": {
+          "temperature": 0.3
+        }
+      },
+      "id": "b23cbc71-73fc-4677-ae6a-81c528b3ec2a",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        3184,
+        656
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "O15aNB3icNpWMpEK",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const agentResp = $input.first().json;\nconst ctx = $('Preparar Input Agente').first().json;\n\nconst rawText = agentResp.output || '{}';\n\nlet parsed = null;\n\n// 1. Tenta extrair qualquer bloco entre a primeira chave '{' e a última '}'\nconst jsonMatch = rawText.match(/\\{[\\s\\S]*\\}/);\nif (jsonMatch) {\n  try {\n    parsed = JSON.parse(jsonMatch[0]);\n  } catch(e) {\n    parsed = null;\n  }\n}\n\n// 2. Se falhou, tenta limpando tags markdown e espaços\nif (!parsed) {\n  const cleaned = rawText\n    .replace(/^```json\\s*/im, '')\n    .replace(/^```\\s*/im, '')\n    .replace(/\\s*```$/m, '')\n    .trim();\n  try {\n    parsed = JSON.parse(cleaned);\n  } catch(e) {\n    parsed = null;\n  }\n}\n\n// 3. Fallback defensivo: se não houver JSON válido, extrai apenas texto limpo humano\nif (!parsed) {\n  let safeText = rawText\n    .replace(/```json[\\s\\S]*```/gi, '')\n    .replace(/```[\\s\\S]*```/gi, '')\n    .replace(/\\{[\\s\\S]*\\}/gi, '')\n    .replace(/[\"'{}]/g, '')\n    .trim();\n\n  parsed = {\n    mensagem_whatsapp: safeText || \"Olá! Como posso te ajudar hoje?\",\n    novos_dados: {},\n    aguardando_especialista: false,\n    horario_agendado: null,\n    resumo_conversa: null\n  };\n}\n\nconst mensagem = (parsed.mensagem_whatsapp || '').trim();\nconst novos_dados = parsed.novos_dados || {};\nconst aguardando_especialista = parsed.aguardando_especialista === true;\nconst horario_agendado = parsed.horario_agendado || ctx.horario_agendado || null;\nconst resumo_conversa = parsed.resumo_conversa || ctx.resumo_conversa || null;\n\nconst dados_qual = Object.assign({}, ctx.dados_qualificacao, novos_dados);\nif (horario_agendado) dados_qual.horario_agendado = horario_agendado;\n\nreturn [{json: Object.assign({}, ctx, {\n  mensagem_whatsapp: mensagem,\n  novos_dados: novos_dados,\n  dados_qualificacao: dados_qual,\n  aguardando_especialista: aguardando_especialista,\n  horario_agendado: horario_agendado,\n  resumo_conversa: resumo_conversa\n})}];\n"
+      },
+      "id": "b43a34d0-b188-4513-931e-15929d5d9a86",
+      "name": "Parsear Resposta e Agendamento",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3744,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx = $input.first().json;\nconst dq = ctx.dados_qualificacao || {};\n\nconst patchBody = {\n  Id: ctx.lead_id,\n  em_atendimento: true,\n  aguardando_especialista: ctx.aguardando_especialista || false,\n  horario_agendado: ctx.horario_agendado || null,\n  resumo_conversa: ctx.resumo_conversa || null\n};\n\nif (dq.cultura_principal) patchBody.cultura_principal = dq.cultura_principal;\nif (dq.volume_safra)      patchBody.volume_safra = dq.volume_safra;\nif (dq.volume_bois)       patchBody.volume_bois = dq.volume_bois;\nif (dq.estado)            patchBody.estado = dq.estado;\nif (dq.momento_protecao)  patchBody.momento_protecao = dq.momento_protecao;\n\nreturn [{json: Object.assign({}, ctx, { patchBody: patchBody })}];\n"
+      },
+      "id": "fb3582f6-c292-40d0-a731-e24149d67682",
+      "name": "Montar Body PATCH",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4016,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "nocoDbApiToken",
+        "operation": "update",
+        "projectId": "pqidm66rx0b1wjb",
+        "table": "m6zmneu2vrp2vz5",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldName": "Id",
+              "fieldValue": "={{ $json.lead_id }}"
+            },
+            {
+              "fieldName": "em_atendimento",
+              "fieldValue": "={{ $json.patchBody.em_atendimento }}"
+            },
+            {
+              "fieldName": "aguardando_especialista",
+              "fieldValue": "={{ $json.patchBody.aguardando_especialista }}"
+            },
+            {
+              "fieldName": "horario_agendado",
+              "fieldValue": "={{ $json.patchBody.horario_agendado }}"
+            },
+            {
+              "fieldName": "resumo_conversa",
+              "fieldValue": "={{ $json.patchBody.resumo_conversa }}"
+            }
+          ]
+        }
+      },
+      "id": "ecbdfd7d-3ec9-4638-9e03-31e0e080df3f",
+      "name": "Atualizar Lead NocoDB",
+      "type": "n8n-nodes-base.nocoDb",
+      "typeVersion": 3,
+      "position": [
+        4256,
+        288
+      ],
+      "credentials": {
+        "nocoDbApiToken": {
+          "id": "tvXnAQ6fV0Cg8Bvw",
+          "name": "NocoDB Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Nome e mensagem\nconst primeiroNome = $('Preparar Contexto Lead').first().json.lead_first_name || '';\nlet mensagem = $('Parsear Resposta e Agendamento').first().json.mensagem_whatsapp || '';\nmensagem = mensagem\n  .replace(/\\[nome\\]/gi, primeiroNome)\n  .replace(/\\{nome\\}/gi, primeiroNome);\n\nconst LIMITE = 120;\n\n// Divide sentenças sem quebrar números (R$ 240.000, 75hp, 4.000 RPM etc.)\n// Só quebra em . ! ? quando o próximo caractere não-espaço for maiúsculo ou fim de string\nfunction splitSentencas(texto) {\n  var resultado = [];\n  var atual = '';\n  var i = 0;\n  while (i < texto.length) {\n    atual += texto[i];\n    if ('.!?'.indexOf(texto[i]) !== -1) {\n      var j = i + 1;\n      // Avança pelos espaços à frente\n      while (j < texto.length && texto[j] === ' ') { j++; }\n      var proximoEhMaiusculo = j >= texto.length || /[A-ZÁÉÍÓÚÀÂÊÔÃÕÜÇ\"'(]/.test(texto[j]);\n      if (proximoEhMaiusculo) {\n        resultado.push(atual.trim());\n        atual = '';\n        i = j - 1; // pula os espaços consumidos\n      }\n    }\n    i++;\n  }\n  if (atual.trim()) resultado.push(atual.trim());\n  return resultado.filter(function(p) { return p.length > 0; });\n}\n\n// Agrupa sentenças respeitando o limite de caracteres\nfunction agrupar(sentencas) {\n  var grupos = [];\n  var atual = '';\n  sentencas.forEach(function(s) {\n    var candidato = atual ? atual + ' ' + s : s;\n    if (candidato.length <= LIMITE) {\n      atual = candidato;\n    } else {\n      if (atual) grupos.push(atual);\n      atual = s; // mantém a sentença mesmo se ultrapassar o limite\n    }\n  });\n  if (atual) grupos.push(atual);\n  return grupos;\n}\n\n// FIX PRINCIPAL: divide por \\n simples (não só \\n\\n)\n// A Ana gera mensagens com \\n entre frases, não \\n\\n\nvar linhas = mensagem\n  .split('\\n')\n  .map(function(l) { return l.trim(); })\n  .filter(function(l) { return l.length > 0; });\n\nvar partes = [];\nlinhas.forEach(function(linha) {\n  if (linha.length <= LIMITE) {\n    partes.push(linha);\n  } else {\n    agrupar(splitSentencas(linha)).forEach(function(g) { partes.push(g); });\n  }\n});\n\nvar resultado = partes.length > 0 ? partes : [mensagem];\nreturn resultado.map(function(p) { return { json: { output: p } }; });"
+      },
+      "id": "1c9ee35b-c905-43e6-9d68-4d5f5c40dd22",
+      "name": "Formatar Partes WhatsApp",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4560,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const texto = $json.output || '';\nconst delay = Math.min(5000, Math.max(1000, Math.floor(texto.length / 50) * 1000));\nreturn [{ json: { ...$json, delay_ms: delay } }];"
+      },
+      "id": "d7afc01f-9c67-49bc-9bec-2c8dd8cb1433",
+      "name": "Calcular Delay",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5280,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "output",
+        "options": {}
+      },
+      "id": "c0495008-33a5-4d93-9e39-5d9c4ec3b460",
+      "name": "Split Out1",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        4800,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": "1",
+        "options": {}
+      },
+      "id": "fdf5f019-5bf8-4fab-9d22-bcdd74da6eb2",
+      "name": "Loop Over Items1",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        5040,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Montar Body PATCH').item.json.config.evolution_url }}/message/sendText/{{ $('Montar Body PATCH').item.json.config.evolution_instance }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "429683C4C977415CAAFCCE10F7D57E11"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\"number\": $(\"Montar Body PATCH\").item.json.phone, \"text\": $json.output, \"delay\": $json.delay_ms} }}",
+        "options": {}
+      },
+      "id": "80d5f251-7be7-4e3c-8af3-c16c61136f47",
+      "name": "Enviar WhatsApp Mensagem",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        5520,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Preparar Input Agente').item.json.lead_id }}",
+        "tableName": "tradebrasil_n8n_chat_histories",
+        "contextWindowLength": 20
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.3,
+      "position": [
+        3376,
+        608
+      ],
+      "id": "644a2224-a7ec-4284-aea1-5cab45cbb6ca",
+      "name": "Postgres Chat Memory",
+      "credentials": {
+        "postgres": {
+          "id": "z3z3Im3ikcCbdOsD",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "description": "Retorna informações detalhadas sobre a TradeBrasil, produtos de proteção de safra (hedge, travas B3/CBOT, opções de venda/Put, barter de insumos), culturas atendidas e como funciona a assessoria da mesa de operações.",
+        "jsCode": "const result = {\n  empresa: {\n    nome: \"TradeBrasil Agro\",\n    segmento: \"Mesa de Operações, Hedge Agrícola e Comercialização Estratégica de Grãos e Pecuária\",\n    proposito: \"Proteger as margens de lucro do produtor rural e garantir preços mínimos para sua safra e boi gordo, eliminando o risco das oscilações de mercado na B3 e Chicago (CBOT).\",\n    diferenciais: [\n      {\n        titulo: \"Operações Sob Medida (Hedge & Mercado Futuro)\",\n        detalhe: \"Trava de preço futuro para Soja, Milho, Boi Gordo e Café na B3 e CBOT. Protege contra quedas bruscas de cotação e variação do dólar.\"\n      },\n      {\n        titulo: \"Mercado de Opções (Seguro de Preço / Put)\",\n        detalhe: \"Permite ao produtor garantir um piso de preço mínimo para venda. Se o mercado cair, ele está protegido no piso; se o mercado subir, ele não fica preso e aproveita 100% da alta.\"\n      },\n      {\n        titulo: \"Barter Inteligente & Comercialização de Insumos\",\n        detalhe: \"Assessoria na negociação de adubos, sementes e defensivos via troca por grãos futuros. Ajudamos a calcular a relação de troca real, evitando custos ocultos cobrados por revendas.\"\n      },\n      {\n        titulo: \"Acompanhamento Direto com a Mesa\",\n        detalhe: \"O produtor não precisa operar telas de bolsa nem entender de finanças complexas. O consultor da TradeBrasil monitora o mercado e orienta exatamente a hora certa de agir.\"\n      }\n    ],\n    perfil_atendido: {\n      culturas: \"Soja, Milho, Boi Gordo (corte/confinamento), Café e Trigo.\",\n      porte: \"Médio e grande produtor (a partir de 10.000 sacas de grãos ou a partir de 200 cabeças de gado).\",\n      regioes: \"Mato Grosso, Goiás, Mato Grosso do Sul, Paraná, Rio Grande do Sul, Minas Gerais, Bahia, MAPITO e demais polos agrícolas do Brasil.\"\n    },\n    como_funciona_o_atendimento: {\n      etapa_1: \"O produtor conversa brevemente por aqui (WhatsApp) para informar sua cultura e região.\",\n      etapa_2: \"Agendamos uma conversa telefônica de 5 a 10 minutos com o consultor especialista da mesa de operações.\",\n      etapa_3: \"Na ligação, o consultor apresenta as cotações atuais de trava para a região do produtor e calcula opções de proteção sem compromisso.\",\n      custo_da_ligacao: \"100% gratuita, sem nenhum compromisso ou taxa de adesão.\"\n    }\n  }\n};\nreturn JSON.stringify(result);\n"
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.3,
+      "position": [
+        3840,
+        608
+      ],
+      "id": "bcbf75ce-b003-4a59-b2f3-8f76b08edc05",
+      "name": "buscar_info_produto"
+    },
+    {
+      "parameters": {
+        "description": "Retorna respostas sugeridas para objeções comuns de produtores rurais (preço, risco, esperar colheita, cooperativa, falta de tempo, tamanho da fazenda). Use sempre que o produtor expressar qualquer dúvida, hesitação ou resistência.",
+        "jsCode": "const result = {\n  objecoes: [\n    {\n      objecao: \"Não entendo nada de bolsa / acho muito complicado / não sei operar hedge\",\n      resposta: \"Essa é a melhor parte: você não precisa operar nem entender termos complicados da bolsa. O produtor cuida da terra e da porteira para dentro. A equipe da TradeBrasil cuida de toda a parte operacional da mesa e traduz tudo na linguagem simples do campo: quantas sacas cobrem o seu custo e qual o valor mínimo garantido no seu bolso.\"\n    },\n    {\n      objecao: \"Acho que o preço vai subir mais, vou esperar a safra / colheita\",\n      resposta: \"Torcer para subir é o que todo mundo quer, mas deixar 100% da safra no risco é perigoso. Se vier uma super-safra lá fora ou o dólar cair, o preço despenca. O ideal é travar o suficiente para pagar os custos de produção e, se quiser, usar opções para deixar o restante livre para capturar a alta. Nosso consultor pode te mostrar uma simulação de 5 minutos sem compromisso.\"\n    },\n    {\n      objecao: \"Quanto custa o serviço / Quanto vocês cobram de consultoria?\",\n      resposta: \"Essa primeira ligação com o nosso especialista da mesa é 100% gratuita e sem compromisso. Ele vai entender sua safra e te mostrar as cotações reais de trava. Se você decidir fazer alguma proteção, as taxas de corretagem são estruturadas diretamente nas operações, com total transparência. Qual dia e horário fica melhor para ele te ligar?\"\n    },\n    {\n      objecao: \"Já tenho comprador / vendo tudo para a cooperativa ou trading da minha região\",\n      resposta: \"Perfeito! A TradeBrasil não substitui sua cooperativa nem suas tradings parceiras. Pelo contrário: tendo a garantia de um preço mínimo na mesa de operações, você ganha muito mais força para negociar o melhor prêmio físico local, sem precisar aceitar qualquer valor na colheita por desespero.\"\n    },\n    {\n      objecao: \"Estou na colheita / no plantio / sem tempo agora\",\n      resposta: \"Com certeza, o trabalho no campo não para! A ligação é bem rápida, coisa de 5 a 10 minutos, no horário que você estiver no barracão ou na sede. Você prefere hoje no fim da tarde ou amanhã pela manhã?\"\n    },\n    {\n      objecao: \"Já fiz trava antes e perdi dinheiro / acho arriscado\",\n      resposta: \"Entendo perfeitamente o receio. Muitas vezes isso acontece quando alguém opera como especulador em vez de fazer hedge real, ou quando faz contratos físicos amarrados sem flexibilidade. O objetivo da TradeBrasil é proteção de custo e travamento de margem, usando ferramentas que protegem a queda sem te prejudicar se o mercado subir. Vale bater um papo rápido de 5 minutos com o consultor para ver essa diferença.\"\n    },\n    {\n      objecao: \"Tenho pouco volume / minha fazenda é pequena\",\n      resposta: \"A gente atende produtores a partir de 10 mil sacas ou 200 cabeças de gado. Me diz qual é a sua expectativa de colheita ou de lote para esta safra, que eu já vejo se conseguimos encaixar você com o nosso consultor.\"\n    }\n  ]\n};\nreturn JSON.stringify(result);\n"
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.3,
+      "position": [
+        3664,
+        608
+      ],
+      "id": "491db7c6-d036-4b61-a73e-a397bf7653b2",
+      "name": "tratar_objecao"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "149338d5-4b13-421a-9341-9b60a07d1cb8",
+              "leftValue": "={{ $json.body.data.message.audioMessage.mimetype }}",
+              "rightValue": "=audio/ogg; codecs=opus",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -640,
+        416
+      ],
+      "id": "611186e7-5288-4501-8bd1-0602c24edf70",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://agentesn8n-evolution.cqc86v.easypanel.host/chat/getBase64FromMediaMessage/Trade%20Brasil",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "429683C4C977415CAAFCCE10F7D57E11"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.requestBody }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        176,
+        528
+      ],
+      "id": "0d55f718-8247-4b5a-935d-fe2f44f09dcf",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json.body.data;\n\nreturn [{\n  json: {\n    requestBody: {\n      message: {\n        key: data.key,\n        message: data.message\n      },\n      convertToMp4: false\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -48,
+        528
+      ],
+      "id": "fd9b9da2-022b-46e4-b340-1940f0622005",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "jsCode": "const base64 = $input.first().json.base64;\nconst buffer = Buffer.from(base64, 'base64');\n\nreturn [{\n  json: {},\n  binary: {\n    data: {\n      data: buffer.toString('base64'),\n      mimeType: 'audio/ogg',\n      fileName: 'audio.ogg',\n      fileExtension: 'ogg'\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        384,
+        528
+      ],
+      "id": "3aad7366-61ef-41f0-a2db-f4fb565f6a87",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "resource": "audio",
+        "operation": "transcribe",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        592,
+        528
+      ],
+      "id": "ab5926c4-b065-44f1-bbbb-8944a8aeee9a",
+      "name": "Transcribe a recording",
+      "credentials": {
+        "openAiApi": {
+          "id": "O15aNB3icNpWMpEK",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pega dados do webhook (pinData ainda está disponível via $('Receber Mensagem WhatsApp'))\nconst webhookData = $('Receber Mensagem WhatsApp').first().json;\nconst body = webhookData.body || {};\nconst data = body.data || {};\nconst key = data.key || {};\nconst remoteJid = key.remoteJid || '';\nconst phone = remoteJid.split('@')[0].replace(/[^0-9]/g, '');\n\n// Pega o texto transcrito pelo Whisper\nconst transcribedText = $input.first().json.text || '';\n\nreturn [{\n  json: {\n    phone: phone,\n    pushName: data.pushName || '',\n    message: transcribedText,\n    instance: body.instance || '',\n    timestamp: new Date().toISOString(),\n    isAudio: true,\n    config: {\n      evolution_url: 'https://agentesn8n-evolution.cqc86v.easypanel.host',\n      evolution_instance: 'Trade%20Brasil',\n      dashboard_webhook_url: 'https://tradebrasil-dashboard.vercel.app/api/evolution-webhook',\n      dashboard_webhook_secret: 'tradebrasil_evolution_secret_2026'\n    }\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        528
+      ],
+      "id": "a957824e-5639-416f-9c8f-a14d45e831a8",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "943ff609-67ba-4c21-898f-01551f3b4c22",
+              "leftValue": "={{ $json.body.data.key.fromMe }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "a502da47-b57d-4189-9fab-c5caffdf95da",
+              "leftValue": "={{ $json.body.data.key.remoteJid }}",
+              "rightValue": "@g.us",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -288,
+        544
+      ],
+      "id": "ce484dc5-5244-4f84-8ffc-31b18a6cddaa",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "6f748153-f8be-47eb-a256-5422578b5796",
+              "leftValue": "={{ $json.body.data.key.remoteJid }}",
+              "rightValue": "@g.us",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              }
+            },
+            {
+              "id": "fdc86df2-e969-4f2b-88ba-6c01dc7172ca",
+              "leftValue": "={{ $json.body.event }}",
+              "rightValue": "=messages.update",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -288,
+        320
+      ],
+      "id": "a1b93f59-8ff9-465d-ae2d-69c712e2609c",
+      "name": "If2"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "637282b7-fa39-4df4-8d0c-42ec13f791a9",
+              "leftValue": "={{ $('Buscar Lead NocoDB').item.json.aguardando_especialista }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2672,
+        304
+      ],
+      "id": "453f0ba8-6d4a-49d5-96c5-362c4f74a08a",
+      "name": "If3"
+    },
+    {
+      "parameters": {
+        "amount": 8
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        384,
+        320
+      ],
+      "id": "f5d99940-74a8-42dc-932a-f752344bea34",
+      "name": "Aguardar Buffer",
+      "webhookId": "c0eb7112-ae68-4cc7-ac9c-f3ad510ec931"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "a545c1a2-9f36-4c67-9165-e2696b3482c2",
+              "leftValue": "={{ Number($json.newer_count) }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        800,
+        320
+      ],
+      "id": "17da15bf-7821-400f-b896-2c7652fce08f",
+      "name": "Existe Mensagem Mais Nova"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $('Coletar Pendentes').all();\nconst ctx = $('Extrair Phone e Message').first().json;\n\nconst mergedMessage = rows.map(r => r.json.message).join(' ');\nconst ids = rows.map(r => r.json.id);\n\nreturn [{ json: {\n  ...ctx,\n  merged_message: mergedMessage,\n  buffer_ids: ids,\n  message_count: ids.length\n}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1392,
+        320
+      ],
+      "id": "32f0330e-4c63-4f96-b3b0-b16341a202d7",
+      "name": "Montar merged_message"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || {};\nconst data = body.data || {};\nconst phone = (data.key?.remoteJid || '').split('@')[0].replace(/\\D/g, '');\nconst message = data.message?.conversation\n  || data.message?.extendedTextMessage?.text\n  || '';\n\n// Escapa apóstrofos simples para proteger contra erros de sintaxe SQL no Postgres\nconst message_escaped = message.replace(/'/g, \"''\");\n\nreturn [{ json: { ...($input.first().json), phone, message_raw: message, message_escaped } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -48,
+        320
+      ],
+      "id": "4c471674-9530-49a7-9794-8e446b26a12a",
+      "name": "Extrair Phone e Message"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO message_buffer (phone, message)\nVALUES ('{{ $json.phone }}', '{{ $json.message_escaped }}')\nRETURNING id, received_at;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        176,
+        320
+      ],
+      "id": "58700db2-8cac-4409-af94-b2656f2e380a",
+      "name": "Salvar no Buffer",
+      "credentials": {
+        "postgres": {
+          "id": "z3z3Im3ikcCbdOsD",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT COUNT(*) AS newer_count\nFROM message_buffer\nWHERE phone = '{{ $('Extrair Phone e Message').item.json.phone }}'\n  AND processed = FALSE\n  AND id > {{ $('Salvar no Buffer').item.json.id }};",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        592,
+        320
+      ],
+      "id": "a4088239-86fc-4cd6-a05f-c02e4c75ef3f",
+      "name": "Verificar Mais Nova",
+      "credentials": {
+        "postgres": {
+          "id": "z3z3Im3ikcCbdOsD",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, message FROM message_buffer\nWHERE phone = '{{ $('Extrair Phone e Message').item.json.phone }}'\n  AND processed = FALSE\nORDER BY id ASC;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1008,
+        320
+      ],
+      "id": "4e0d3df6-e1e6-41b2-a4b4-a10d67a3cccb",
+      "name": "Coletar Pendentes",
+      "credentials": {
+        "postgres": {
+          "id": "z3z3Im3ikcCbdOsD",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE message_buffer\nSET processed = TRUE\nWHERE phone = '{{ $('Extrair Phone e Message').item.json.phone }}'\n  AND processed = FALSE\n  AND id <= {{ $('Salvar no Buffer').item.json.id }};",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1200,
+        320
+      ],
+      "id": "967c1647-e9a3-4a77-92d1-df9411f7df08",
+      "name": "Marcar Processadas",
+      "credentials": {
+        "postgres": {
+          "id": "z3z3Im3ikcCbdOsD",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1392,
+        528
+      ],
+      "id": "6d20fd91-5f09-42d8-83b9-9f3b184b3c44",
+      "name": "-"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.config.dashboard_webhook_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-evolution-webhook-secret",
+              "value": "={{ $json.config.dashboard_webhook_secret }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $('Receber Mensagem WhatsApp').first().json.body || {} }}",
+        "options": {}
+      },
+      "id": "01d4a8e2-trade-dash-notif-lead",
+      "name": "Notificar Dashboard TradeBrasil",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1936,
+        140
+      ],
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "pinData": {
+    "Receber Mensagem WhatsApp": [
+      {
+        "json": {
+          "headers": {
+            "host": "agentesn8n-n8n.cqc86v.easypanel.host",
+            "user-agent": "axios/1.13.2",
+            "content-length": "1391",
+            "accept": "application/json, text/plain, */*",
+            "accept-encoding": "gzip, compress, deflate, br",
+            "content-type": "application/json",
+            "x-forwarded-for": "172.18.0.1",
+            "x-forwarded-host": "agentesn8n-n8n.cqc86v.easypanel.host",
+            "x-forwarded-port": "443",
+            "x-forwarded-proto": "https",
+            "x-forwarded-server": "505f2e987be7",
+            "x-real-ip": "172.18.0.1"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "event": "messages.upsert",
+            "instance": "Trade Brasil",
+            "data": {
+              "key": {
+                "remoteJid": "554792197484@s.whatsapp.net",
+                "remoteJidAlt": "554792197484@s.whatsapp.net",
+                "fromMe": false,
+                "id": "3A97BA68BFD3232FFB86",
+                "participant": "",
+                "addressingMode": "lid"
+              },
+              "pushName": "gustavo",
+              "status": "DELIVERY_ACK",
+              "message": {
+                "conversation": "Sim pelo que eu pesquisei e top ela",
+                "messageContextInfo": {
+                  "threadId": [],
+                  "deviceListMetadata": {
+                    "senderKeyIndexes": [],
+                    "recipientKeyIndexes": [],
+                    "senderTimestamp": {
+                      "low": 1785708892,
+                      "high": 0,
+                      "unsigned": true
+                    },
+                    "receiverAccountType": 1,
+                    "recipientKeyHash": {
+                      "0": 10,
+                      "1": 179,
+                      "2": 198,
+                      "3": 16,
+                      "4": 192,
+                      "5": 6,
+                      "6": 88,
+                      "7": 113,
+                      "8": 91,
+                      "9": 8
+                    },
+                    "recipientTimestamp": {
+                      "low": 1785238657,
+                      "high": 0,
+                      "unsigned": true
+                    }
+                  },
+                  "deviceListMetadataVersion": 2,
+                  "messageSecret": {
+                    "0": 71,
+                    "1": 87,
+                    "2": 16,
+                    "3": 77,
+                    "4": 196,
+                    "5": 226,
+                    "6": 127,
+                    "7": 71,
+                    "8": 16,
+                    "9": 42,
+                    "10": 94,
+                    "11": 122,
+                    "12": 236,
+                    "13": 207,
+                    "14": 204,
+                    "15": 226,
+                    "16": 113,
+                    "17": 243,
+                    "18": 14,
+                    "19": 87,
+                    "20": 114,
+                    "21": 96,
+                    "22": 231,
+                    "23": 120,
+                    "24": 130,
+                    "25": 94,
+                    "26": 68,
+                    "27": 191,
+                    "28": 91,
+                    "29": 237,
+                    "30": 105,
+                    "31": 171
+                  }
+                }
+              },
+              "messageType": "conversation",
+              "messageTimestamp": 1785768797,
+              "instanceId": "9719f82c-6ce6-44e1-96da-436cc4e71a1e",
+              "source": "ios"
+            },
+            "destination": "https://agentesn8n-n8n.cqc86v.easypanel.host/webhook/sdr-tradebrasil",
+            "date_time": "2026-08-03T11:53:17.579Z",
+            "sender": "554291410686@s.whatsapp.net",
+            "server_url": "https://evolution.agrometadigital.com",
+            "apikey": "292005614930-4D84-82A0-E14AA608A3B8"
+          },
+          "webhookUrl": "https://agentesn8n-n8n.cqc86v.easypanel.host/webhook/sdr-tradebrasil",
+          "executionMode": "production"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Receber Mensagem WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Inicializar e Config": {
+      "main": [
+        [
+          {
+            "node": "Buscar Lead NocoDB",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Notificar Dashboard TradeBrasil",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Lead NocoDB": {
+      "main": [
+        [
+          {
+            "node": "Preparar Contexto Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Contexto Lead": {
+      "main": [
+        [
+          {
+            "node": "Lead Existe?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lead Existe?": {
+      "main": [
+        [
+          {
+            "node": "If3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Criar Lead NocoDB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Input Agente": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Criar Lead NocoDB": {
+      "main": [
+        [
+          {
+            "node": "Definir ID Lead Criado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Definir ID Lead Criado": {
+      "main": [
+        [
+          {
+            "node": "Preparar Input Agente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Parsear Resposta e Agendamento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar Body PATCH": {
+      "main": [
+        [
+          {
+            "node": "Atualizar Lead NocoDB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Atualizar Lead NocoDB": {
+      "main": [
+        [
+          {
+            "node": "Formatar Partes WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatar Partes WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Split Out1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calcular Delay": {
+      "main": [
+        [
+          {
+            "node": "Enviar WhatsApp Mensagem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items1": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Calcular Delay",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres Chat Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "buscar_info_produto": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "tratar_objecao": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "If2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Transcribe a recording",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transcribe a recording": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "-",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If2": {
+      "main": [
+        [
+          {
+            "node": "Extrair Phone e Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If3": {
+      "main": [
+        [
+          {
+            "node": "Preparar Input Agente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aguardar Buffer": {
+      "main": [
+        [
+          {
+            "node": "Verificar Mais Nova",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Existe Mensagem Mais Nova": {
+      "main": [
+        [
+          {
+            "node": "Coletar Pendentes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar merged_message": {
+      "main": [
+        [
+          {
+            "node": "Inicializar e Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extrair Phone e Message": {
+      "main": [
+        [
+          {
+            "node": "Salvar no Buffer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Salvar no Buffer": {
+      "main": [
+        [
+          {
+            "node": "Aguardar Buffer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar Mais Nova": {
+      "main": [
+        [
+          {
+            "node": "Existe Mensagem Mais Nova",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Coletar Pendentes": {
+      "main": [
+        [
+          {
+            "node": "Marcar Processadas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marcar Processadas": {
+      "main": [
+        [
+          {
+            "node": "Montar merged_message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "-": {
+      "main": [
+        [
+          {
+            "node": "Inicializar e Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parsear Resposta e Agendamento": {
+      "main": [
+        [
+          {
+            "node": "Montar Body PATCH",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar WhatsApp Mensagem": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "f90d8045-96b3-4609-96df-29329336996b",
+  "meta": {
+    "aiBuilderAssisted": true,
+    "templateCredsSetupCompleted": true,
+    "instanceId": "c7d066142c3a204136686f25d3f060040ba0cd8d0715b784e06a52cadade21d7"
+  },
+  "nodeGroups": [],
+  "id": "vX67Ir5rl6S3GDNV",
+  "tags": []
+}

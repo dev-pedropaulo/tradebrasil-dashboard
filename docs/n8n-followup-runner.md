@@ -1,42 +1,39 @@
-# Runner n8n — Follow-ups TradeBrasil
+# Runner n8n — Follow-up com IA Dinâmica (TradeBrasil)
 
-Crie este workflow separado do `AGENTE SDR - TRADE BRASIL`; não altere o agente SDR nem o seu banco PostgreSQL. Nome sugerido: `FOLLOW-UP | TradeBrasil | Runner`.
+O workflow pronto para importação no n8n está localizado em:
+`template-agente/FOLLOWUP-RUNNER-IA-TRADEBRASIL.json`
 
-Deixe-o **inativo** até que as quatro tabelas da [estrutura NocoDB](./nocodb-followup-schema.md) existam, os IDs estejam preenchidos e a instância correta da Evolution seja confirmada.
+Nome oficial: `[TRADEBRASIL] Follow-up Runner com IA Dinâmica`
 
-## Credenciais
+---
 
-- Reutilize a credencial NocoDB da base `TradeBrasil` já disponível no n8n.
-- Selecione explicitamente a credencial/instância Evolution que pertence a este cliente. Não reutilize uma instância de outro cliente sem confirmar o nome dela.
-- Configure o fuso do workflow como `America/Sao_Paulo`.
+## Como Funciona a Geração Dinâmica por IA (Opção 2)
 
-## Fluxo de disparo (a cada 1 minuto)
+Diferente de réguas antigas que repetem a mesma mensagem estática a cada mês (o que gera desgaste e queima o lead), este runner opera com **inteligência contextual**:
 
-1. **Schedule Trigger** — intervalo de 1 minuto, timezone `America/Sao_Paulo`.
-2. **NocoDB / Follow-up Events / Search** (`mup88e2fr0xy173`) — retorne apenas `status = agendado` e `agendado_para <= agora`. Como o PostgreSQL interno do NocoDB armazena as datas em UTC, a expressão de filtro `exactDate` deve usar `$now.setZone("UTC")`:
-   `where`: `=(status,eq,agendado)~and(agendado_para,le,exactDate,{{ $now.setZone("UTC").toFormat("yyyy-MM-dd HH:mm:ss") }})`
-3. **Loop Over Items** — lote de 1; não force itens vazios.
-4. **NocoDB / Leads / Search** — localize pelo `Id` do campo `lead_id` do evento. Valide que o telefone é brasileiro antes de enviar.
-5. **Evolution API / Send Text** — `remoteJid` recebe `telefone`; `messageText` recebe a `mensagem` do evento. A mensagem é texto estático.
-6. **NocoDB / Follow-up Events / Update** — em sucesso: `status = enviado`, `executado_em = agora`, e salve o id retornado pelo provedor em `provedor_mensagem_id` quando disponível.
-7. Para evento `recorrente`, **NocoDB / Follow-up Schedule / Update**: mantenha `primeiro_envio_em`, calcule `proximo_envio_em = próximo ciclo` a partir da cadência, e crie um novo evento `recorrente` com status `agendado` para esse horário.
-8. **NocoDB / Leads / Update** — atualize `followup_ultimo_envio_em` e `followup_proximo_envio_em`.
+1. **A cada ciclo agendado (ex.: a cada 15, 30 ou 60 dias):**
+   - O n8n localiza os eventos vencidos no NocoDB.
+   - Carrega o cadastro atualizado do produtor (`nome`, `cultura_principal`, `volume_safra`, `volume_bois`, `estado`, `resumo_conversa`, data do último contato).
+2. **Geração Inédita via GPT-4o:**
+   - A IA gera uma mensagem de WhatsApp **100% inédita** de 1 a 3 frases curtas.
+   - Conecta com a cultura e o estado do produtor (ex.: *"Oi Pedro, o mercado de soja deu uma respirada hoje e muitos produtores aí de MG estão aproveitando para cobrir o custo de adubo..."*).
+   - Varia a saudação e o gancho temático, nunca soando como spam ou robô.
+   - Termina com um convite leve para uma conversa rápida de 5 minutos com o consultor da mesa de operações.
+3. **Disparo e Auditoria Completa:**
+   - Envia via Evolution API na instância `Trade Brasil`.
+   - Salva a mensagem **exata** gerada no histórico da tabela `events` do NocoDB, ficando visível para auditoria na aba **Follow-ups** do Dashboard.
+4. **Reagendamento Automático da Cadência:**
+   - Se for um plano recorrente, o runner agenda automaticamente o próximo ciclo para daqui a `recorrencia_dias` (ex.: +30 dias).
+5. **Cancelamento Imediato por Resposta:**
+   - Quando o produtor responder a qualquer mensagem desse follow-up, o webhook da Evolution aciona `/api/evolution-webhook` e desativa o plano na hora, passando o bastão para o Agente SDR de atendimento.
 
-Use a saída de erro do nó Evolution: em falha, atualize o evento para `status = falhou`, grave `erro` e `executado_em`. Não cancele o schedule e não interrompa os ciclos seguintes.
+---
 
-## Regras que o runner não pode violar
+## Como Importar no n8n
 
-- Uma mensagem `avulso` é enviada somente no seu horário e não altera `primeiro_envio_em`, `recorrencia_dias` ou `proximo_envio_em` do schedule.
-- Se o schedule estiver com `status = cancelado`, o evento deve ser ignorado e marcado como concluído/cancelado, sem envio.
-- Não crie uma nova agenda quando a falha for de entrega.
-- O workflow deve ser idempotente: antes de enviar, recarregue o evento e só prossiga se ele ainda estiver `agendado`.
-- A URL do webhook da Evolution deve apontar para `/api/evolution-webhook` do dashboard, enviando somente eventos de mensagem recebida. Envie no header `x-evolution-webhook-secret` o mesmo valor privado de `EVOLUTION_WEBHOOK_SECRET` da Vercel.
-
-## Teste de aceite
-
-1. Crie um template e um schedule para o telefone de teste.
-2. Defina o primeiro envio para dois minutos à frente.
-3. Confirme `enviado` em `Follow-up Events`, o próximo ciclo calculado e a projeção atualizada em `Leads`.
-4. Programe um `avulso` próximo do ciclo e confira o alerta de 48h; o próximo ciclo recorrente deve permanecer igual.
-5. Teste a resposta do lead com `cancelamento_por_resposta` marcado e desmarcado.
-6. Teste uma falha de Evolution e confira que ela aparece no dashboard sem cancelar o schedule.
+1. Acesse o seu n8n (`https://agentesn8n-n8n.cqc86v.easypanel.host`).
+2. Clique no menu superior direito `...` -> **Import from File**.
+3. Selecione o arquivo `template-agente/FOLLOWUP-RUNNER-IA-TRADEBRASIL.json`.
+4. Conecte a credencial do **OpenAI Chat Model** (`OpenAi account` / `O15aNB3icNpWMpEK`).
+5. As requisições para o NocoDB e Evolution API já utilizam os tokens e URLs pré-configurados do ambiente TradeBrasil.
+6. Ative o workflow.

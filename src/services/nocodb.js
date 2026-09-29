@@ -54,6 +54,33 @@ export function formatLeadData(lead) {
     'acima_de_2.000_bois': '> 2.000 Cabeças',
   };
   const normalizedUF = normalizeState(lead.estado);
+  const isAgendado = Boolean(lead.aguardando_especialista || lead.horario_agendado);
+  const isEmAtendimento = Boolean(lead.em_atendimento);
+  const isRespondido = lead.followup_status === 'respondido';
+  const hasFollowup = Boolean(lead.followup_status && lead.followup_status !== 'pendente' && lead.followup_status !== 'respondido') || Number(lead.followup_ciclo_atual || 0) > 0;
+
+  let statusAtendimentoKey = 'novo';
+  let statusAtendimentoLabel = 'Novo Lead';
+  let statusAtendimentoBadgeClass = 'badge-neutral';
+
+  if (isAgendado) {
+    statusAtendimentoKey = 'agendado';
+    statusAtendimentoLabel = 'Reunião Agendada';
+    statusAtendimentoBadgeClass = 'badge-emerald';
+  } else if (isEmAtendimento) {
+    statusAtendimentoKey = 'atendimento';
+    statusAtendimentoLabel = 'Em Atendimento (SDR)';
+    statusAtendimentoBadgeClass = 'badge-blue';
+  } else if (isRespondido) {
+    statusAtendimentoKey = 'respondido';
+    statusAtendimentoLabel = 'Respondeu Follow-up';
+    statusAtendimentoBadgeClass = 'badge-purple';
+  } else if (hasFollowup) {
+    statusAtendimentoKey = 'followup';
+    statusAtendimentoLabel = `Follow-up (Ciclo ${lead.followup_ciclo_atual || 1})`;
+    statusAtendimentoBadgeClass = 'badge-amber';
+  }
+
   return {
     ...lead,
     estado: normalizedUF,
@@ -64,5 +91,14 @@ export function formatLeadData(lead) {
     volumeSafraLabel: volumeSafraMap[lead.volume_safra] || lead.volume_safra || '-',
     volumeBoisLabel: volumeBoisMap[lead.volume_bois] || lead.volume_bois || '-',
     isHot: lead.momento_protecao === 'quero_avaliar_uma_estratégia_agora',
+    isAgendado,
+    isEmAtendimento,
+    isRespondido,
+    hasFollowup,
+    horarioAgendado: lead.horario_agendado || null,
+    resumoConversa: lead.resumo_conversa || null,
+    statusAtendimentoKey,
+    statusAtendimentoLabel,
+    statusAtendimentoBadgeClass,
   };
 }

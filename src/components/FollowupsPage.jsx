@@ -138,6 +138,14 @@ export default function FollowupsPage() {
     [workspace.events],
   );
 
+  const recentSentEvents = useMemo(
+    () => workspace.events
+      .filter((event) => event.status === 'concluido' || event.status === 'enviado')
+      .sort((a, b) => new Date(b.executado_em || b.UpdatedAt).getTime() - new Date(a.executado_em || a.UpdatedAt).getTime())
+      .slice(0, 10),
+    [workspace.events],
+  );
+
   const oneOffLeadSchedule = useMemo(() => {
     if (!oneOffForm.leadId) return null;
     return activeSchedules.find((s) => Number(s.lead_id) === Number(oneOffForm.leadId)) || null;
@@ -412,7 +420,7 @@ export default function FollowupsPage() {
             <CalendarClock size={16} /> Criar follow-up recorrente
           </div>
 
-          {/* Alternador de Modo: Sequência Estruturada vs Modelo Único */}
+          {/* Alternador de Modo: Cadência com IA Dinâmica vs Modelo Fixo */}
           <div className="followup-cadence-toggle">
             <button
               type="button"
@@ -428,29 +436,32 @@ export default function FollowupsPage() {
                 }
               }}
             >
-              <Sparkles size={13} /> Sequência 4 Etapas (Recomendado)
+              <Sparkles size={13} /> Cadência com IA Dinâmica (Recomendado)
             </button>
             <button
               type="button"
               className={`followup-cadence-btn ${scheduleMode === 'single' ? 'active' : ''}`}
               onClick={() => setScheduleMode('single')}
             >
-              <Layers size={13} /> Modelo Fixo
+              <Layers size={13} /> Modelo Fixo Estático
             </button>
           </div>
 
           {scheduleMode === 'sequence' && (
             <div className="followup-sequence-stepper">
-              <div style={{ fontSize: '0.73rem', fontWeight: 600, color: 'var(--accent-emerald)', marginBottom: '0.2rem' }}>
-                Cadência Comercial Contínua a cada 30 dias:
+              <div style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--accent-emerald)', marginBottom: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <Sparkles size={13} /> Motor Inteligente de Follow-up (GPT-4o Ativo)
               </div>
+              <p style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', margin: '0 0 0.5rem 0', lineHeight: 1.4 }}>
+                A cada ciclo de envio, a IA consulta a cultura, estado, safra e histórico do produtor para gerar <strong>mensagens de WhatsApp 100% inéditas</strong>, variando saudações e ganchos de mercado para não repetir abordagens.
+              </p>
               <div className="followup-sequence-step">
                 <span className="followup-sequence-step-num">1</span>
-                <div><strong>Início (Dia 0):</strong> Apresentação & Momento Safra</div>
+                <div><strong>Ciclo Inicial (Dia 0):</strong> Apresentação & Momento Safra</div>
               </div>
               <div className="followup-sequence-step">
                 <span className="followup-sequence-step-num">2</span>
-                <div><strong>+30 dias:</strong> Monitoramento & Oportunidades de Mercado</div>
+                <div><strong>+30 dias:</strong> Variação de Mercado (B3 / Chicago / Câmbio)</div>
               </div>
               <div className="followup-sequence-step">
                 <span className="followup-sequence-step-num">3</span>
@@ -625,7 +636,11 @@ export default function FollowupsPage() {
                 activeSchedules.map((schedule) => (
                   <tr key={recordId(schedule)}>
                     <td><strong>{leadName(schedule.lead_id)}</strong></td>
-                    <td><span className="followup-badge followup-badge-active">{templateName(schedule.template_id)}</span></td>
+                    <td>
+                      <span className="followup-badge followup-badge-active" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                        <Sparkles size={11} /> IA Dinâmica ({templateName(schedule.template_id)})
+                      </span>
+                    </td>
                     <td>{schedule.recorrencia_dias} dias</td>
                     <td>{formatDate(schedule.proximo_envio_em)}</td>
                     <td>{schedule.cancelamento_por_resposta ? 'Ao responder' : 'Manual'}</td>
@@ -642,7 +657,66 @@ export default function FollowupsPage() {
         </div>
       </div>
 
-      {/* Bloco 5: Falhas de Envio */}
+      {/* Bloco 5: Histórico de Envios Recentes com IA */}
+      <div className="clean-card" style={sectionStyle}>
+        <div className="followup-section-title">
+          <Sparkles size={16} /> Envios Recentes & Mensagens Geradas por IA ({recentSentEvents.length})
+        </div>
+        {recentSentEvents.length === 0 ? (
+          <p className="followup-help">Nenhum envio recente registrado ainda.</p>
+        ) : (
+          <div className="clean-table-container">
+            <table className="clean-table">
+              <thead>
+                <tr>
+                  <th>Lead</th>
+                  <th>Data do Disparo</th>
+                  <th>Mensagem Enviada (WhatsApp)</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentSentEvents.map((event) => (
+                  <tr key={recordId(event)}>
+                    <td>
+                      <strong>{leadName(event.lead_id)}</strong>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                        ID #{event.lead_id}
+                      </div>
+                    </td>
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      {formatDate(event.executado_em || event.agendado_para)}
+                    </td>
+                    <td>
+                      <div
+                        style={{
+                          fontSize: '0.78rem',
+                          color: 'var(--text-secondary)',
+                          lineHeight: 1.45,
+                          maxWidth: '520px',
+                          background: 'rgba(255,255,255,0.02)',
+                          padding: '0.5rem 0.75rem',
+                          borderRadius: 'var(--radius-sm)',
+                          borderLeft: '3px solid var(--accent-emerald)',
+                        }}
+                      >
+                        {event.mensagem || 'Mensagem enviada com sucesso.'}
+                      </div>
+                    </td>
+                    <td>
+                      <span className="followup-badge followup-badge-active" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                        <CheckCircle2 size={12} /> Enviado
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Bloco 6: Falhas de Envio */}
       <div className="clean-card" style={sectionStyle}>
         <div className="followup-section-title"><AlertTriangle size={16} /> Falhas de envio ({failedEvents.length})</div>
         {failedEvents.length === 0 ? (
