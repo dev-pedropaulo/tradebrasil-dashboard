@@ -26,6 +26,10 @@ export function updateFollowupTemplate(id, input) {
   return requestFollowups('template', { method: 'PATCH', body: input, id });
 }
 
+export function deleteFollowupTemplate(id) {
+  return requestFollowups('template', { method: 'DELETE', id });
+}
+
 export function createFollowupSchedule(input) {
   return requestFollowups('schedule', { method: 'POST', body: input });
 }

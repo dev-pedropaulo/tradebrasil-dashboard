@@ -8,6 +8,7 @@ import {
 import {
   NocoDBConfigurationError,
   createRecord,
+  deleteRecord,
   listRecords,
   updateRecord,
 } from './_lib/nocodb.js';
@@ -85,6 +86,17 @@ async function editTemplate(id, input) {
   if (input.ativo !== undefined) fields.ativo = Boolean(input.ativo);
   const template = await updateRecord('templates', id, fields);
   return { template };
+}
+
+async function deleteTemplate(id) {
+  const templateId = requirePositiveId(id, 'Modelo');
+  const schedules = await listRecords('schedules');
+  const inUse = schedules.some((s) => s.status === 'ativo' && Number(s.template_id) === templateId);
+  if (inUse) {
+    throw new Error('Não é possível excluir um modelo em uso por follow-ups ativos.');
+  }
+  await deleteRecord('templates', templateId);
+  return { success: true, id: templateId };
 }
 
 async function createSchedule(input) {
@@ -176,6 +188,7 @@ export default async function handler(req, res) {
     const body = await readBody(req);
     if (req.method === 'POST' && action === 'template') return res.status(201).json(await createTemplate(body));
     if (req.method === 'PATCH' && action === 'template') return res.status(200).json(await editTemplate(req.query?.id, body));
+    if (req.method === 'DELETE' && action === 'template') return res.status(200).json(await deleteTemplate(req.query?.id));
     if (req.method === 'POST' && action === 'schedule') return res.status(201).json(await createSchedule(body));
     if (req.method === 'DELETE' && action === 'schedule') return res.status(200).json(await cancelSchedule(req.query?.id));
     if (req.method === 'POST' && action === 'one-off') return res.status(201).json(await createOneOff(body));

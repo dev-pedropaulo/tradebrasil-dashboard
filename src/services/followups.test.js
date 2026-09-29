@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   cancelFollowupSchedule,
   createFollowupSchedule,
+  deleteFollowupTemplate,
   fetchFollowupWorkspace,
   updateFollowupTemplate,
 } from './followups';
@@ -63,6 +64,17 @@ describe('follow-up API client', () => {
     await cancelFollowupSchedule(5);
 
     expect(fetchMock).toHaveBeenCalledWith('/api/followups?action=schedule&id=5', expect.objectContaining({
+      method: 'DELETE',
+    }));
+  });
+
+  it('deletes a template sending id as a proper query param', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ success: true, id: 3 }) });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await deleteFollowupTemplate(3);
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/followups?action=template&id=3', expect.objectContaining({
       method: 'DELETE',
     }));
   });

@@ -12,6 +12,7 @@ import {
   Send,
   Settings2,
   Sparkles,
+  Trash2,
   X,
   XCircle,
 } from 'lucide-react';
@@ -19,6 +20,7 @@ import {
   cancelFollowupSchedule,
   createFollowupSchedule,
   createFollowupTemplate,
+  deleteFollowupTemplate,
   fetchFollowupWorkspace,
   scheduleOneOffMessage,
   updateFollowupTemplate,
@@ -189,6 +191,18 @@ export default function FollowupsPage() {
     }
   };
 
+  const handleDeleteTemplate = async (template) => {
+    const id = recordId(template);
+    if (!window.confirm(`Tem certeza que deseja excluir o modelo #${id} "${template.nome}"?`)) return;
+    const result = await runMutation(
+      () => deleteFollowupTemplate(id),
+      () => `Modelo #${id} excluído com sucesso.`,
+    );
+    if (result && editingTemplateId === id) {
+      cancelEditingTemplate();
+    }
+  };
+
   const submitSchedule = async (event) => {
     event.preventDefault();
     const payload = {
@@ -355,15 +369,27 @@ export default function FollowupsPage() {
                             {active ? 'Ativo' : 'Inativo'}
                           </span>
                         </div>
-                        <button
-                          type="button"
-                          className="btn-clean followup-btn-icon"
-                          onClick={() => startEditingTemplate(template)}
-                          title="Editar modelo"
-                        >
-                          <Edit2 size={13} />
-                          <span>Editar</span>
-                        </button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <button
+                            type="button"
+                            className="btn-clean followup-btn-icon"
+                            onClick={() => startEditingTemplate(template)}
+                            title="Editar modelo"
+                          >
+                            <Edit2 size={13} />
+                            <span>Editar</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-clean followup-btn-icon followup-cancel"
+                            onClick={() => handleDeleteTemplate(template)}
+                            title="Excluir modelo"
+                            disabled={busy}
+                          >
+                            <Trash2 size={13} />
+                            <span>Excluir</span>
+                          </button>
+                        </div>
                       </div>
                       <div className="followup-list-msg" title={template.mensagem}>
                         {template.mensagem}
