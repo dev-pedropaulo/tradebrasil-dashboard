@@ -13,7 +13,8 @@ Deixe-o **inativo** até que as quatro tabelas da [estrutura NocoDB](./nocodb-fo
 ## Fluxo de disparo (a cada 1 minuto)
 
 1. **Schedule Trigger** — intervalo de 1 minuto, timezone `America/Sao_Paulo`.
-2. **NocoDB / Follow-up Events / Search** — retorne apenas `status = agendado` e `agendado_para <= agora`.
+2. **NocoDB / Follow-up Events / Search** (`mup88e2fr0xy173`) — retorne apenas `status = agendado` e `agendado_para <= agora`. Como o PostgreSQL interno do NocoDB armazena as datas em UTC, a expressão de filtro `exactDate` deve usar `$now.setZone("UTC")`:
+   `where`: `=(status,eq,agendado)~and(agendado_para,le,exactDate,{{ $now.setZone("UTC").toFormat("yyyy-MM-dd HH:mm:ss") }})`
 3. **Loop Over Items** — lote de 1; não force itens vazios.
 4. **NocoDB / Leads / Search** — localize pelo `Id` do campo `lead_id` do evento. Valide que o telefone é brasileiro antes de enviar.
 5. **Evolution API / Send Text** — `remoteJid` recebe `telefone`; `messageText` recebe a `mensagem` do evento. A mensagem é texto estático.
